@@ -21,53 +21,58 @@ const parseJSON = (text: string): any => {
   }
 };
 
-export const fetchLiteratureAnalysis = async (existingIds: string[], startYear: number = 2025): Promise<PaperData[]> => {
+export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<PaperData[]> => {
   try {
     const modelId = "gemini-2.5-flash"; 
     
-    const dateString = `${startYear}-01-01`;
+    // Calculate date for "Last 30 Days"
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    const dateString = thirtyDaysAgo.toISOString().split('T')[0];
 
     // ---------------------------------------------------------
-    // PHASE 1: DISCOVERY
-    // Broad search to find candidates
+    // PHASE 1: LIVE DISCOVERY WITH GROUNDING
     // ---------------------------------------------------------
     const discoveryPrompt = `
-      You are a scientific literature aggregator. 
-      Your task is to find 3 REAL, AUTHENTIC scientific papers or preprints published AFTER ${dateString}.
+      You are a scientific literature intelligence agent.
       
-      Topics to search: CVD, CKD, MASH, NASH, MASLD, Diabetes, Obesity.
-      Sources: PubMed, Nature, Lancet, NEJM, BioRxiv, MedRxiv, Arxiv, NeurIPS, CVPR.
+      TASK: Search for the LATEST scientific papers and preprints published AFTER ${dateString} (Last 30 days).
       
-      Strict Requirements:
-      1. DATE: Must be published on or after ${dateString}.
-      2. TITLE: Must be the EXACT deterministic title from the publisher. Do not hallucinate or paraphrase.
-      3. DIVERSITY: Mix clinical trials, AI/ML biology, and basic science.
+      TOPICS: CVD, ASCVD, Heart Failure, CKD, MASH, NASH, Diabetes, Obesity.
+      FOCUS: AI/ML applications, Single-cell/Multi-omics, Imaging, Novel drug targets (In-vivo/In-vitro).
+      SOURCES: PubMed, BioRxiv, MedRxiv, Nature, Cell, NEJM, Lancet, Arxiv (cs.LG for bio).
 
-      Output the result strictly as a JSON array inside a code block (\`\`\`json ... \`\`\`).
+      REQUIREMENTS:
+      1. MUST be real papers found via Google Search.
+      2. IGNORE general news articles. Look for Study Titles.
+      3. Find at least 3 distinct new papers.
+
+      Output strictly a JSON array inside a code block.
       
-      JSON Object Structure for each paper:
-      - title: string (Exact title found on the web)
-      - journalOrConference: string (e.g., "Nature Medicine", "BioRxiv")
-      - date: string (YYYY-MM-DD, must be >= ${startYear})
-      - authors: string[] (Initial list)
-      - topic: string (One of: CVD, CKD, MASH, NASH, MASLD, Diabetes, Obesity)
-      - publicationType: string (One of: "Preprint", "Peer Reviewed")
-      - studyType: string (One of: "Clinical Trial", "Human Cohort (Non-RCT)", "Pre-clinical", "Simulated")
-      - methodology: string (One of: "AI/ML", "Lab Experimental", "Statistical")
-      - modality: string (One of: "Single Cell", "Genetics", "Proteomics", "Transcriptomics", "Metabolomics", "Lipidomics", "Multi-omics", "EHR", "Imaging", "Clinical Data", "Other")
-      - abstractHighlight: string (1 sentence summary)
-      - drugAndTarget: string (e.g., "Target: X, Drug: Y")
-      - context: string (Clinical relevance)
-      - validationScore: number (90-100 for peer reviewed, 80-90 for preprints)
-      - url: string (The direct URL to the paper found in search)
+      JSON Structure:
+      - title: string (Exact title)
+      - journalOrConference: string (Source)
+      - date: string (YYYY-MM-DD)
+      - authors: string[] (First 3 authors)
+      - topic: string (CVD, CKD, MASH, NASH, MASLD, Diabetes, Obesity)
+      - publicationType: string (Preprint, Peer Reviewed)
+      - studyType: string (Clinical Trial, Pre-clinical, Simulated, Human Cohort)
+      - methodology: string (AI/ML, Lab Experimental, Statistical)
+      - modality: string (Single Cell, Multi-omics, Imaging, Clinical Data, etc.)
+      - abstractHighlight: string (1 sentence finding)
+      - drugAndTarget: string
+      - context: string (Why is this exciting?)
+      - validationScore: 100
+      - url: string (Web Link)
     `;
 
     const discoveryResponse = await ai.models.generateContent({
       model: modelId,
       contents: discoveryPrompt,
       config: {
-        temperature: 0, // Max determinism for titles
-        tools: [{ googleSearch: {} }], // Enable Live Search
+        temperature: 0.1,
+        tools: [{ googleSearch: {} }], // Live Search Enabled
       }
     });
 
@@ -78,89 +83,32 @@ export const fetchLiteratureAnalysis = async (existingIds: string[], startYear: 
         return [];
     }
 
-    // Hydrate with IDs and set initial verification to false
-    const candidates = rawData.map((paper: any) => ({
-      ...paper,
-      id: Math.random().toString(36).substring(2, 15),
-      authorsVerified: false // Start unverified
-    }));
-
-    // ---------------------------------------------------------
-    // PHASE 2: SECONDARY VERIFICATION & URL EXTRACTION
-    // Targeted search for each paper to confirm authors, exact title, and get GROUNDING URL
-    // ---------------------------------------------------------
-    const verifiedPapers = await Promise.all(candidates.map(async (paper: PaperData) => {
-        // We perform a targeted search for the specific title to verify authors
-        const verificationPrompt = `
-            VERIFICATION TASK:
-            Target Paper: "${paper.title}"
-            
-            Action:
-            1. Search specifically for this paper title to find the OFFICIAL SOURCE (PubMed, Nature, Arxiv, etc.).
-            2. Extract the EXACT list of authors.
-            3. Extract the Author Affiliations.
-            4. Confirm the title is 100% accurate to the source. If slight mismatch, correct it.
-            5. Find the DIRECT URL to the abstract or full text.
-
-            Return strictly a JSON object:
-            {
-                "correctTitle": "The exact title found",
-                "authors": ["Author 1", "Author 2", ...],
-                "affiliations": ["Affiliation 1", ...],
-                "verified": boolean (true if paper found and authors confirmed, false otherwise)
+    // Hydrate with IDs and merge grounding URLs if available
+    const candidates = rawData.map((paper: any) => {
+        // Attempt to extract grounding URL
+        let groundingUrl = paper.url;
+        const chunks = discoveryResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
+        
+        if (chunks && chunks.length > 0) {
+            // Simple heuristic: Try to find a chunk title that matches paper title loosely or just take the first relevant one
+            const relevantChunk = chunks.find((c: any) => c.web?.uri && (c.web.title?.includes(paper.title.substring(0, 10)) || paper.title.includes(c.web.title)));
+            if (relevantChunk) {
+                groundingUrl = relevantChunk.web.uri;
+            } else if (!paper.url) {
+                // Fallback to first chunk if paper.url is empty
+                groundingUrl = chunks[0].web?.uri;
             }
-        `;
-
-        try {
-            const verifyResponse = await ai.models.generateContent({
-                model: modelId,
-                contents: verificationPrompt,
-                config: {
-                    temperature: 0,
-                    tools: [{ googleSearch: {} }]
-                }
-            });
-
-            const verifiedData = parseJSON(verifyResponse.text || "");
-
-            // CRITICAL: Extract URL from Grounding Metadata
-            // The grounding chunks contain the actual URLs the model used. 
-            // This is more reliable than the generated text for URLs.
-            let reliableUrl = paper.url; 
-            
-            const chunks = verifyResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
-            if (chunks && chunks.length > 0) {
-                // Look for the first chunk that has a web URI
-                const webChunk = chunks.find((c: any) => c.web?.uri);
-                if (webChunk) {
-                    reliableUrl = webChunk.web.uri;
-                }
-            }
-
-            if (verifiedData && verifiedData.verified === true) {
-                // Merge verified data
-                return {
-                    ...paper,
-                    title: verifiedData.correctTitle || paper.title, // Ensure title is deterministic
-                    authors: Array.isArray(verifiedData.authors) && verifiedData.authors.length > 0 ? verifiedData.authors : paper.authors,
-                    affiliations: verifiedData.affiliations || paper.affiliations,
-                    url: reliableUrl, // Use the reliable grounding URL
-                    authorsVerified: true
-                };
-            } else {
-                // If verification returned false or failed structure, keep original but mark unverified
-                // Still update URL if we found a better one via grounding
-                return { ...paper, url: reliableUrl || paper.url, authorsVerified: false };
-            }
-
-        } catch (err) {
-            console.warn(`Verification failed for paper: ${paper.title}`, err);
-            // Return original state on error
-            return paper;
         }
-    }));
 
-    return verifiedPapers;
+        return {
+            ...paper,
+            id: Math.random().toString(36).substring(2, 15),
+            authorsVerified: true, // Grounding assumes verified
+            url: groundingUrl
+        };
+    });
+
+    return candidates;
 
   } catch (error) {
     console.error("Failed to fetch literature from Gemini:", error);

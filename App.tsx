@@ -4,113 +4,108 @@ import { Sidebar } from './components/Sidebar';
 import { PaperCard } from './components/PaperCard';
 import { StatCard } from './components/StatCard';
 import { TrackerStack } from './components/TrackerStack';
-import { PaperData, DiseaseTopic, PublicationType, StudyType, Methodology } from './types';
+import { PaperData, DiseaseTopic, StudyType, Methodology, PublicationType } from './types';
 import { INITIAL_PAPERS, APP_NAME, APP_VERSION } from './constants';
 import { fetchLiteratureAnalysis } from './services/geminiService';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { RefreshCw, BookOpen, Activity, FlaskConical, Database, FileCheck, FileClock } from 'lucide-react';
+import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Cell } from 'recharts';
+import { RefreshCw, BookOpen, Activity, FlaskConical, Database, History, Radio, Sparkles } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [papers, setPapers] = useState<PaperData[]>(INITIAL_PAPERS);
+  // --- STATE ---
+  // Archive Data (Static Landmark Papers)
+  const [archivePapers] = useState<PaperData[]>(INITIAL_PAPERS);
+  
+  // Live Data (Fetched from API)
+  const [livePapers, setLivePapers] = useState<PaperData[]>([]);
+  
+  // UI State
+  const [activeTab, setActiveTab] = useState<'archive' | 'live'>('archive');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
+
+  // Filters
   const [activeTopics, setActiveTopics] = useState<DiseaseTopic[]>(Object.values(DiseaseTopic));
   const [activeStudyTypes, setActiveStudyTypes] = useState<StudyType[]>(Object.values(StudyType));
   const [activeMethodologies, setActiveMethodologies] = useState<Methodology[]>(Object.values(Methodology));
-  const [showPreprintsOnly, setShowPreprintsOnly] = useState<boolean>(false);
-  // Default is false to ensure verified 2024 papers are visible on load
-  const [only2025, setOnly2025] = useState<boolean>(false);
-  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [eraFilter, setEraFilter] = useState<'all' | '5years' | '1year'>('all');
 
-  // Filter papers logic
+  // --- FILTERING LOGIC ---
+  const currentPapers = activeTab === 'archive' ? archivePapers : livePapers;
+
   const filteredPapers = useMemo(() => {
-    const filtered = papers.filter(paper => {
+    const filtered = currentPapers.filter(paper => {
       const topicMatch = activeTopics.includes(paper.topic);
       const studyTypeMatch = activeStudyTypes.includes(paper.studyType);
       const methodologyMatch = activeMethodologies.includes(paper.methodology);
-      const preprintMatch = showPreprintsOnly ? paper.publicationType === PublicationType.Preprint : true;
       
-      // Date Logic
-      const paperDate = new Date(paper.date);
-      
-      // 2025 Toggle
-      const yearMatch = only2025 ? paperDate.getFullYear() === 2025 : true;
+      // Date/Era Logic (Only applies to Archive, Live is always "Now")
+      let dateMatch = true;
+      if (activeTab === 'archive') {
+          const paperYear = new Date(paper.date).getFullYear();
+          const currentYear = new Date().getFullYear();
+          if (eraFilter === '5years') dateMatch = paperYear >= (currentYear - 5);
+          if (eraFilter === '1year') dateMatch = paperYear >= 2024;
+      }
 
-      // Custom Range Logic
-      // If start date is set, paper date must be >= start date
-      const startMatch = dateRange.start ? paperDate >= new Date(dateRange.start) : true;
-      // If end date is set, paper date must be <= end date
-      const endMatch = dateRange.end ? paperDate <= new Date(dateRange.end) : true;
-
-      return topicMatch && studyTypeMatch && methodologyMatch && preprintMatch && yearMatch && startMatch && endMatch;
+      return topicMatch && studyTypeMatch && methodologyMatch && dateMatch;
     });
 
-    // Sort by date descending (Newest first) to ensure "Since Jan" list is chronological
+    // Sort: Newest First
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [papers, activeTopics, activeStudyTypes, activeMethodologies, showPreprintsOnly, only2025, dateRange]);
+  }, [currentPapers, activeTopics, activeStudyTypes, activeMethodologies, eraFilter, activeTab]);
 
-  // Stats calculation
+  // --- STATS LOGIC ---
   const stats = useMemo(() => {
     return {
-        total: papers.length,
-        peerReviewed: papers.filter(p => p.publicationType === PublicationType.PeerReviewed).length,
-        preprints: papers.filter(p => p.publicationType === PublicationType.Preprint).length,
-        aiMl: papers.filter(p => p.methodology.includes('AI/ML')).length,
-        trials: papers.filter(p => p.studyType.includes('Trial')).length
+        total: filteredPapers.length,
+        trials: filteredPapers.filter(p => p.studyType.includes('Trial')).length,
+        aiMl: filteredPapers.filter(p => p.methodology.includes('AI/ML')).length,
+        preprints: filteredPapers.filter(p => p.publicationType === PublicationType.Preprint).length,
     };
-  }, [papers]);
+  }, [filteredPapers]);
 
   // Chart Data
   const topicData = useMemo(() => {
     const counts: Record<string, number> = {};
     Object.values(DiseaseTopic).forEach(t => counts[t] = 0);
-    papers.forEach(p => {
+    filteredPapers.forEach(p => {
         if (counts[p.topic] !== undefined) counts[p.topic]++;
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value })).filter(i => i.value > 0);
-  }, [papers]);
+  }, [filteredPapers]);
   
   const COLORS = ['#60A5FA', '#34D399', '#818CF8', '#F472B6', '#FBBF24', '#A78BFA', '#F87171'];
 
-  // Handlers
-  const handleRefresh = async () => {
+  // --- HANDLERS ---
+  const handleLiveRefresh = async () => {
     setIsLoading(true);
-    const existingIds = papers.map(p => p.id);
-    // If filtering by 2025, search 2025. Otherwise search from 2024 to include recent past.
-    const startYear = only2025 ? 2025 : 2024;
-    const newPapers = await fetchLiteratureAnalysis(existingIds, startYear);
+    setActiveTab('live'); // Switch to live tab
+    
+    // Simulate "Checking sources..." delay for UX
+    await new Promise(r => setTimeout(r, 800));
+
+    const newPapers = await fetchLiteratureAnalysis([]);
     
     if (newPapers.length > 0) {
-        // Prepend new papers to simulate a live feed
-        setPapers(prev => [...newPapers, ...prev]);
-        setLastUpdated(new Date());
+        setLivePapers(prev => {
+            // Deduplicate based on title
+            const newUnique = newPapers.filter(np => !prev.some(op => op.title === np.title));
+            return [...newUnique, ...prev];
+        });
+        setLastLiveUpdate(new Date());
     }
     setIsLoading(false);
   };
 
   const toggleTopic = (topic: DiseaseTopic) => {
-    setActiveTopics(prev => 
-      prev.includes(topic) ? prev.filter(t => t !== topic) : [...prev, topic]
-    );
+    setActiveTopics(prev => prev.includes(topic) ? prev.filter(t => t !== topic) : [...prev, topic]);
   };
-
   const toggleStudyType = (type: StudyType) => {
-    setActiveStudyTypes(prev => 
-      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-    );
+    setActiveStudyTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
   };
-
   const toggleMethodology = (methodology: Methodology) => {
-    setActiveMethodologies(prev => 
-      prev.includes(methodology) ? prev.filter(m => m !== methodology) : [...prev, methodology]
-    );
+    setActiveMethodologies(prev => prev.includes(methodology) ? prev.filter(m => m !== methodology) : [...prev, methodology]);
   };
-
-  // Initial fetch simulation on mount
-  useEffect(() => {
-    // User can trigger a refresh manually to get the absolute latest live data
-    // We start with a robust static set of 2024 papers in constants.ts
-  }, []);
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 flex flex-col font-sans selection:bg-blue-500/30">
@@ -119,24 +114,12 @@ const App: React.FC = () => {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Dashboard Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-8">
             <StatCard 
-                label="Total Tracked" 
+                label="Active Papers" 
                 value={stats.total} 
                 icon={<Database className="w-5 h-5 text-blue-400" />}
-                trend="+12 today"
-            />
-            <StatCard 
-                label="Peer Reviewed" 
-                value={stats.peerReviewed} 
-                icon={<FileCheck className="w-5 h-5 text-green-400" />}
-                colorClass="text-green-400"
-            />
-             <StatCard 
-                label="Preprints" 
-                value={stats.preprints} 
-                icon={<FileClock className="w-5 h-5 text-amber-400" />}
-                colorClass="text-amber-400"
+                trend={activeTab === 'live' ? "Live View" : "Archive"}
             />
             <StatCard 
                 label="Clinical Trials" 
@@ -150,9 +133,8 @@ const App: React.FC = () => {
                 icon={<FlaskConical className="w-5 h-5 text-fuchsia-400" />}
                 colorClass="text-fuchsia-400"
             />
-            <div className="hidden lg:block">
-                 {/* Mini volume chart placeholder for layout balance */}
-                 <TrackerStack daily={4} weekly={18} monthly={142} />
+             <div className="hidden xl:block col-span-3">
+                 <TrackerStack daily={activeTab === 'live' ? stats.total : 0} weekly={stats.total * 3} monthly={stats.total * 12} />
             </div>
         </div>
 
@@ -165,21 +147,51 @@ const App: React.FC = () => {
             toggleStudyType={toggleStudyType}
             activeMethodologies={activeMethodologies}
             toggleMethodology={toggleMethodology}
-            showPreprintsOnly={showPreprintsOnly}
-            togglePreprints={() => setShowPreprintsOnly(!showPreprintsOnly)}
-            only2025={only2025}
-            toggle2025={() => setOnly2025(!only2025)}
-            dateRange={dateRange}
-            setDateRange={setDateRange}
+            eraFilter={eraFilter}
+            setEraFilter={setEraFilter}
           />
 
           {/* Main Feed Area */}
           <div className="flex-1 min-w-0">
              
-             {/* Chart Area (Collapsible or Sticky-ish) */}
+             {/* Feed Tabs & Header */}
+             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                
+                {/* Custom Tabs */}
+                <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700">
+                    <button 
+                        onClick={() => setActiveTab('archive')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'archive' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                        <History className="w-4 h-4" />
+                        Key Papers (Since 2010)
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('live')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'live' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                        {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Radio className="w-4 h-4" />}
+                        Live Intelligence Feed
+                    </button>
+                </div>
+
+                {/* Refresh Button (Context Aware) */}
+                <button 
+                    onClick={handleLiveRefresh}
+                    disabled={isLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 hover:border-blue-500 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-all"
+                >
+                    <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+                    {activeTab === 'live' ? 'Fetch Latest Papers' : 'Switch to Live Search'}
+                </button>
+             </div>
+
+             {/* Chart Area */}
              <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-6">
-                <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">Topic Distribution</h3>
-                <div className="h-48 w-full">
+                <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">
+                    {activeTab === 'archive' ? 'Historical Topic Distribution' : 'Live Trend Distribution'}
+                </h3>
+                <div className="h-32 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={topicData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
@@ -200,34 +212,22 @@ const App: React.FC = () => {
                 </div>
              </div>
 
-             {/* Feed Header */}
-             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-blue-500" />
-                    Live Literature Feed
-                </h2>
-                <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-500 hidden sm:inline">Last updated: {lastUpdated.toLocaleTimeString()}</span>
-                    <button 
-                        onClick={handleRefresh}
-                        disabled={isLoading}
-                        className={`flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium text-sm transition-all shadow-lg shadow-blue-600/20 ${isLoading ? 'opacity-75 cursor-not-allowed' : ''}`}
-                    >
-                        <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                        {isLoading ? 'Analyzing Live Data...' : 'Refresh Feed'}
-                    </button>
-                </div>
-             </div>
-
              {/* Papers List */}
              <div className="space-y-1">
-                {filteredPapers.length === 0 ? (
-                    <div className="text-center py-20 border-2 border-dashed border-slate-700 rounded-xl">
-                        <p className="text-slate-400">No papers match current filters.</p>
-                        {(only2025 || dateRange.start || dateRange.end) && (
-                            <p className="text-xs text-slate-500 mt-2">Try relaxing your date filters or toggling off "2025 Only".</p>
-                        )}
+                {activeTab === 'live' && livePapers.length === 0 && !isLoading && (
+                    <div className="text-center py-12 border-2 border-dashed border-slate-700 rounded-xl bg-slate-800/30">
+                        <Radio className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                        <p className="text-slate-300 font-medium">Ready to scan live sources.</p>
+                        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                            Click "Fetch Latest Papers" to trigger the AI agent to search Google, PubMed, and BioRxiv for papers published in the last 30 days.
+                        </p>
                     </div>
+                )}
+                
+                {filteredPapers.length === 0 && activeTab === 'archive' ? (
+                     <div className="text-center py-20">
+                        <p className="text-slate-400">No papers match the current era filter.</p>
+                     </div>
                 ) : (
                     filteredPapers.map(paper => (
                         <PaperCard key={paper.id} paper={paper} />
@@ -245,14 +245,11 @@ const App: React.FC = () => {
             <p className="text-slate-400 text-sm mb-2">
                 {APP_NAME} v{APP_VERSION} • Developed by <span className="text-blue-400 font-semibold">Vivek Das</span>
             </p>
-            <p className="text-slate-600 text-xs mb-4">
-                Built with React 18, TypeScript, Tailwind CSS, Recharts, Lucide & Google Gemini API.
-            </p>
             <div className="inline-block px-4 py-2 bg-slate-800/50 rounded border border-slate-700">
                 <p className="text-[10px] text-slate-500 max-w-xl mx-auto leading-relaxed">
-                    <strong>VERIFIED FEED:</strong> This feed utilizes <strong>Google Search Grounding</strong> to retrieve real-time scientific data. 
-                    All papers displayed are cross-referenced with live web sources (PubMed, Arxiv, etc.). 
-                    Author lists and titles are extracted deterministically from search results.
+                    <strong>DUAL MODE SYSTEM:</strong> <br/>
+                    1. <strong>Archive:</strong> Curated list of verified landmark papers (2010-Present).<br/>
+                    2. <strong>Live Feed:</strong> Real-time AI agent using Google Search Grounding to find papers from the last 30 days.
                 </p>
             </div>
         </div>
