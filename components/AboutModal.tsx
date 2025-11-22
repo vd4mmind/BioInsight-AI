@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Cpu, Globe, Zap, Database, Info } from 'lucide-react';
+import { X, Cpu, Globe, Zap, Info, Search, BrainCircuit } from 'lucide-react';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -54,15 +54,24 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
-                <div className="text-teal-400 text-xs font-bold mb-1">Google Gemini 2.5 Flash</div>
+                <div className="flex items-center gap-2 mb-1">
+                    <BrainCircuit className="w-3 h-3 text-teal-400" />
+                    <div className="text-teal-400 text-xs font-bold">Google Gemini 2.5 Flash</div>
+                </div>
                 <p className="text-slate-500 text-xs">High-speed reasoning engine for analyzing complex medical abstracts.</p>
               </div>
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
-                <div className="text-indigo-400 text-xs font-bold mb-1">Search Grounding</div>
+                <div className="flex items-center gap-2 mb-1">
+                    <Search className="w-3 h-3 text-indigo-400" />
+                    <div className="text-indigo-400 text-xs font-bold">Search Grounding</div>
+                </div>
                 <p className="text-slate-500 text-xs">Real-time connection to Google Search to fetch papers from the last 30 days.</p>
               </div>
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
-                <div className="text-blue-400 text-xs font-bold mb-1">React 19 & Tailwind</div>
+                <div className="flex items-center gap-2 mb-1">
+                    <Zap className="w-3 h-3 text-blue-400" />
+                    <div className="text-blue-400 text-xs font-bold">React 19 & Tailwind</div>
+                </div>
                 <p className="text-slate-500 text-xs">Modern, responsive UI with concurrent rendering features.</p>
               </div>
             </div>
@@ -73,18 +82,18 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-2">
               <Zap className="w-4 h-4 text-yellow-400" /> How Live Intelligence Works
             </h3>
-            <ol className="list-decimal list-inside space-y-2 text-xs text-slate-400">
+            <ol className="list-decimal list-inside space-y-3 text-xs text-slate-400">
               <li>
-                <span className="text-slate-300 font-medium">Query Generation:</span> The system constructs a complex search query targeting specific disease topics and date ranges (Last 30 Days).
+                <span className="text-slate-300 font-bold">Context-Aware Querying:</span> The system analyzes your <span className="text-blue-400">currently selected filters</span> (Disease Topics, Methodologies) to construct a targeted search query, ensuring results are relevant to your specific research interests.
               </li>
               <li>
-                <span className="text-slate-300 font-medium">Grounding Check:</span> Gemini executes the search against Google's live index to find authentic URLs and titles.
+                <span className="text-slate-300 font-bold">Google Search Grounding:</span> Gemini executes a live search against Google's index, prioritizing major journals and preprint servers (BioRxiv/MedRxiv) to find content published in the <span className="text-blue-400">last 30 days</span>.
               </li>
               <li>
-                <span className="text-slate-300 font-medium">Structured Parsing:</span> The AI synthesizes the raw search results into a structured JSON format, extracting authors, journals, and key findings.
+                <span className="text-slate-300 font-bold">AI Synthesis & Parsing:</span> The model processes raw search results into structured clinical data, extracting authors, affiliations, and generating one-sentence abstract highlights.
               </li>
               <li>
-                <span className="text-slate-300 font-medium">Verification:</span> Results are compared against existing entries to ensure a clean, duplicate-free feed.
+                <span className="text-slate-300 font-bold">Verification:</span> Incoming results are compared against existing entries to remove duplicates before being rendered in the feed.
               </li>
             </ol>
           </section>
