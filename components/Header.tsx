@@ -1,8 +1,12 @@
 import React from 'react';
-import { Zap, Activity } from 'lucide-react';
+import { Zap, Activity, Info } from 'lucide-react';
 import { APP_NAME } from '../constants';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onOpenAbout: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onOpenAbout }) => {
   return (
     <header className="bg-slate-900 border-b border-slate-700 sticky top-0 z-50 backdrop-blur-md bg-opacity-90">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -23,7 +27,16 @@ export const Header: React.FC = () => {
              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
              <span className="text-xs text-slate-300 font-medium">System Operational</span>
            </div>
-           <button className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors">
+           
+           <button 
+             onClick={onOpenAbout}
+             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+             title="About BioInsight.AI"
+           >
+             <Info className="w-5 h-5" />
+           </button>
+
+           <button className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-yellow-400 transition-colors">
              <Zap className="w-5 h-5" />
            </button>
         </div>

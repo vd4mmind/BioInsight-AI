@@ -6,19 +6,30 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper to parse JSON from markdown code blocks or raw text
 const parseJSON = (text: string): any => {
-  const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/```\n([\s\S]*?)\n```/);
-  if (jsonMatch && jsonMatch[1]) {
+  // Strategy: Find the last occurrence of a JSON code block, as it usually follows the explanation
+  const jsonBlockRegex = /```json\n([\s\S]*?)\n```/g;
+  const matches = [...text.matchAll(jsonBlockRegex)];
+  
+  if (matches.length > 0) {
     try {
-      return JSON.parse(jsonMatch[1]);
+      // Take the last match, as the model might output intermediate steps
+      return JSON.parse(matches[matches.length - 1][1]);
     } catch (e) {
-      console.error("Failed to parse JSON block:", e);
+      console.warn("Failed to parse JSON from code block, trying raw text cleanup");
     }
   }
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    return null;
+
+  // Fallback: Try to find array brackets directly
+  const arrayMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
+  if (arrayMatch) {
+      try {
+          return JSON.parse(arrayMatch[0]);
+      } catch(e) {
+          console.error("Failed to parse array match", e);
+      }
   }
+
+  return null;
 };
 
 export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<PaperData[]> => {
@@ -34,23 +45,24 @@ export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<Pa
     // ---------------------------------------------------------
     // PHASE 1: LIVE DISCOVERY WITH GROUNDING
     // ---------------------------------------------------------
+    // NOTE: We allow the model to "think" in text first before outputting JSON.
+    // This prevents 'Rpc failed' errors caused by forcing Search Grounding 
+    // to output strict JSON immediately without context.
     const discoveryPrompt = `
       You are a scientific literature intelligence agent.
       
       TASK: Search for the LATEST scientific papers and preprints published AFTER ${dateString} (Last 30 days).
       
       TOPICS: CVD, ASCVD, Heart Failure, CKD, MASH, NASH, Diabetes, Obesity.
-      FOCUS: AI/ML applications, Single-cell/Multi-omics, Imaging, Novel drug targets (In-vivo/In-vitro).
-      SOURCES: PubMed, BioRxiv, MedRxiv, Nature, Cell, NEJM, Lancet, Arxiv (cs.LG for bio).
+      FOCUS: AI/ML applications, Single-cell/Multi-omics, Imaging, Novel drug targets.
+      SOURCES: PubMed, BioRxiv, MedRxiv, Nature, Cell, NEJM, Lancet.
 
-      REQUIREMENTS:
-      1. MUST be real papers found via Google Search.
-      2. IGNORE general news articles. Look for Study Titles.
-      3. Find at least 3 distinct new papers.
+      INSTRUCTIONS:
+      1. Use the Google Search tool to find at least 3 distinct new papers.
+      2. Briefly summarize what you found in natural language (to verify citations).
+      3. AFTER your summary, provide a strictly formatted JSON array inside a \`\`\`json\`\`\` code block.
 
-      Output strictly a JSON array inside a code block.
-      
-      JSON Structure:
+      JSON Structure (Array of Objects):
       - title: string (Exact title)
       - journalOrConference: string (Source)
       - date: string (YYYY-MM-DD)
@@ -64,7 +76,7 @@ export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<Pa
       - drugAndTarget: string
       - context: string (Why is this exciting?)
       - validationScore: 100
-      - url: string (Web Link)
+      - url: string (Web Link if available)
     `;
 
     const discoveryResponse = await ai.models.generateContent({
@@ -76,10 +88,11 @@ export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<Pa
       }
     });
 
-    const rawData = parseJSON(discoveryResponse.text || "");
+    const textResponse = discoveryResponse.text || "";
+    const rawData = parseJSON(textResponse);
     
     if (!Array.isArray(rawData)) {
-        console.warn("Discovery phase returned invalid format");
+        console.warn("Discovery phase returned invalid format. Raw text:", textResponse.substring(0, 200));
         return [];
     }
 
@@ -90,12 +103,18 @@ export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<Pa
         const chunks = discoveryResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
         
         if (chunks && chunks.length > 0) {
-            // Simple heuristic: Try to find a chunk title that matches paper title loosely or just take the first relevant one
-            const relevantChunk = chunks.find((c: any) => c.web?.uri && (c.web.title?.includes(paper.title.substring(0, 10)) || paper.title.includes(c.web.title)));
+            // Search for a chunk that matches the paper title
+            const relevantChunk = chunks.find((c: any) => 
+                c.web?.uri && (
+                    c.web.title?.toLowerCase().includes(paper.title.substring(0, 15).toLowerCase()) || 
+                    paper.title.toLowerCase().includes(c.web.title?.toLowerCase())
+                )
+            );
+
             if (relevantChunk) {
                 groundingUrl = relevantChunk.web.uri;
             } else if (!paper.url) {
-                // Fallback to first chunk if paper.url is empty
+                // Fallback to first chunk if no URL provided in JSON
                 groundingUrl = chunks[0].web?.uri;
             }
         }

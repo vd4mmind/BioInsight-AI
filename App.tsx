@@ -4,11 +4,12 @@ import { Sidebar } from './components/Sidebar';
 import { PaperCard } from './components/PaperCard';
 import { StatCard } from './components/StatCard';
 import { TrackerStack } from './components/TrackerStack';
+import { AboutModal } from './components/AboutModal';
 import { PaperData, DiseaseTopic, StudyType, Methodology, PublicationType } from './types';
 import { INITIAL_PAPERS, APP_NAME, APP_VERSION } from './constants';
 import { fetchLiteratureAnalysis } from './services/geminiService';
 import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Cell } from 'recharts';
-import { RefreshCw, BookOpen, Activity, FlaskConical, Database, History, Radio, Sparkles } from 'lucide-react';
+import { RefreshCw, BookOpen, Activity, FlaskConical, Database, History, Radio, Sparkles, FileText } from 'lucide-react';
 
 const App: React.FC = () => {
   // --- STATE ---
@@ -22,6 +23,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'archive' | 'live'>('archive');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
+  const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
 
   // Filters
   const [activeTopics, setActiveTopics] = useState<DiseaseTopic[]>(Object.values(DiseaseTopic));
@@ -61,6 +63,7 @@ const App: React.FC = () => {
         trials: filteredPapers.filter(p => p.studyType.includes('Trial')).length,
         aiMl: filteredPapers.filter(p => p.methodology.includes('AI/ML')).length,
         preprints: filteredPapers.filter(p => p.publicationType === PublicationType.Preprint).length,
+        peerReviewed: filteredPapers.filter(p => p.publicationType === PublicationType.PeerReviewed).length,
     };
   }, [filteredPapers]);
 
@@ -109,17 +112,29 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 flex flex-col font-sans selection:bg-blue-500/30">
-      <Header />
+      <Header onOpenAbout={() => setIsAboutOpen(true)} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Dashboard Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4 mb-8">
             <StatCard 
                 label="Active Papers" 
                 value={stats.total} 
                 icon={<Database className="w-5 h-5 text-blue-400" />}
                 trend={activeTab === 'live' ? "Live View" : "Archive"}
+            />
+            <StatCard 
+                label="Peer Reviewed" 
+                value={stats.peerReviewed} 
+                icon={<BookOpen className="w-5 h-5 text-green-400" />}
+                colorClass="text-green-400"
+            />
+            <StatCard 
+                label="Preprints" 
+                value={stats.preprints} 
+                icon={<FileText className="w-5 h-5 text-amber-400" />}
+                colorClass="text-amber-400"
             />
             <StatCard 
                 label="Clinical Trials" 
@@ -254,6 +269,9 @@ const App: React.FC = () => {
             </div>
         </div>
       </footer>
+      
+      {/* Modals */}
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
     </div>
   );
 };
