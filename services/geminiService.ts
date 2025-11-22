@@ -50,9 +50,6 @@ export const fetchLiteratureAnalysis = async (existingIds: string[], startYear: 
       - journalOrConference: string (e.g., "Nature Medicine", "BioRxiv")
       - date: string (YYYY-MM-DD, must be >= ${startYear})
       - authors: string[] (Initial list)
-      - affiliations: string[] (Initial list)
-      - funding: string (Primary sponsor or "N/A")
-      - keywords: string[] (3-5 tags)
       - topic: string (One of: CVD, CKD, MASH, NASH, MASLD, Diabetes, Obesity)
       - publicationType: string (One of: "Preprint", "Peer Reviewed")
       - studyType: string (One of: "Clinical Trial", "Human Cohort (Non-RCT)", "Pre-clinical", "Simulated")
@@ -89,8 +86,8 @@ export const fetchLiteratureAnalysis = async (existingIds: string[], startYear: 
     }));
 
     // ---------------------------------------------------------
-    // PHASE 2: SECONDARY VERIFICATION
-    // Targeted search for each paper to confirm authors and exact title
+    // PHASE 2: SECONDARY VERIFICATION & URL EXTRACTION
+    // Targeted search for each paper to confirm authors, exact title, and get GROUNDING URL
     // ---------------------------------------------------------
     const verifiedPapers = await Promise.all(candidates.map(async (paper: PaperData) => {
         // We perform a targeted search for the specific title to verify authors
@@ -99,10 +96,11 @@ export const fetchLiteratureAnalysis = async (existingIds: string[], startYear: 
             Target Paper: "${paper.title}"
             
             Action:
-            1. Search specifically for this paper title.
+            1. Search specifically for this paper title to find the OFFICIAL SOURCE (PubMed, Nature, Arxiv, etc.).
             2. Extract the EXACT list of authors.
             3. Extract the Author Affiliations.
             4. Confirm the title is 100% accurate to the source. If slight mismatch, correct it.
+            5. Find the DIRECT URL to the abstract or full text.
 
             Return strictly a JSON object:
             {
@@ -125,6 +123,20 @@ export const fetchLiteratureAnalysis = async (existingIds: string[], startYear: 
 
             const verifiedData = parseJSON(verifyResponse.text || "");
 
+            // CRITICAL: Extract URL from Grounding Metadata
+            // The grounding chunks contain the actual URLs the model used. 
+            // This is more reliable than the generated text for URLs.
+            let reliableUrl = paper.url; 
+            
+            const chunks = verifyResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
+            if (chunks && chunks.length > 0) {
+                // Look for the first chunk that has a web URI
+                const webChunk = chunks.find((c: any) => c.web?.uri);
+                if (webChunk) {
+                    reliableUrl = webChunk.web.uri;
+                }
+            }
+
             if (verifiedData && verifiedData.verified === true) {
                 // Merge verified data
                 return {
@@ -132,11 +144,13 @@ export const fetchLiteratureAnalysis = async (existingIds: string[], startYear: 
                     title: verifiedData.correctTitle || paper.title, // Ensure title is deterministic
                     authors: Array.isArray(verifiedData.authors) && verifiedData.authors.length > 0 ? verifiedData.authors : paper.authors,
                     affiliations: verifiedData.affiliations || paper.affiliations,
+                    url: reliableUrl, // Use the reliable grounding URL
                     authorsVerified: true
                 };
             } else {
                 // If verification returned false or failed structure, keep original but mark unverified
-                return { ...paper, authorsVerified: false };
+                // Still update URL if we found a better one via grounding
+                return { ...paper, url: reliableUrl || paper.url, authorsVerified: false };
             }
 
         } catch (err) {

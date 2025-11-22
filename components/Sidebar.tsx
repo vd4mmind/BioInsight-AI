@@ -1,16 +1,20 @@
 import React from 'react';
-import { DiseaseTopic, PublicationType, StudyType, ResearchModality } from '../types';
-import { Filter, ChevronDown, CalendarRange, FlaskConical } from 'lucide-react';
+import { DiseaseTopic, PublicationType, StudyType, ResearchModality, Methodology } from '../types';
+import { Filter, ChevronDown, CalendarRange, FlaskConical, Calendar, Microscope } from 'lucide-react';
 
 interface SidebarProps {
   activeTopics: DiseaseTopic[];
   toggleTopic: (topic: DiseaseTopic) => void;
   activeStudyTypes: StudyType[];
   toggleStudyType: (type: StudyType) => void;
+  activeMethodologies: Methodology[];
+  toggleMethodology: (methodology: Methodology) => void;
   showPreprintsOnly: boolean;
   togglePreprints: () => void;
   only2025: boolean;
   toggle2025: () => void;
+  dateRange: { start: string; end: string };
+  setDateRange: (range: { start: string; end: string }) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
@@ -18,10 +22,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   toggleTopic, 
   activeStudyTypes,
   toggleStudyType,
+  activeMethodologies,
+  toggleMethodology,
   showPreprintsOnly, 
   togglePreprints,
   only2025,
-  toggle2025
+  toggle2025,
+  dateRange,
+  setDateRange
 }) => {
   return (
     <aside className="w-full lg:w-64 shrink-0 space-y-6 mb-6 lg:mb-0">
@@ -32,7 +40,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <CalendarRange className="w-4 h-4" />
           <span>Time Range</span>
         </div>
-        <label className="flex items-center justify-between cursor-pointer group p-2 rounded bg-slate-900/50 border border-slate-700/50">
+        
+        <label className="flex items-center justify-between cursor-pointer group p-2 rounded bg-slate-900/50 border border-slate-700/50 mb-4">
             <div className="flex flex-col">
                 <span className="text-sm font-medium text-slate-200">Since Jan 1, 2025</span>
                 <span className="text-[10px] text-slate-500">Strict 2025+ Filter</span>
@@ -41,6 +50,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${only2025 ? 'translate-x-5' : 'translate-x-0'}`}></div>
             </div>
         </label>
+
+        <div className="space-y-3 pt-2 border-t border-slate-700/50">
+           <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+              <Calendar className="w-3 h-3" /> Custom Range
+           </div>
+           <div className="space-y-2">
+             <div className="space-y-1">
+                <label className="text-[10px] text-slate-500 uppercase font-bold">From</label>
+                <input 
+                    type="date" 
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
+                    className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-200 focus:border-blue-500 outline-none transition-colors"
+                />
+             </div>
+             <div className="space-y-1">
+                <label className="text-[10px] text-slate-500 uppercase font-bold">To</label>
+                <input 
+                    type="date" 
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
+                    className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-200 focus:border-blue-500 outline-none transition-colors"
+                />
+             </div>
+             {(dateRange.start || dateRange.end) && (
+                <button 
+                    onClick={() => setDateRange({start: '', end: ''})}
+                    className="text-[10px] text-red-400 hover:text-red-300 underline w-full text-right"
+                >
+                    Clear Dates
+                </button>
+             )}
+           </div>
+        </div>
       </div>
 
       {/* Topics Panel */}
@@ -86,6 +129,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <CheckIcon className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" />
               </div>
               <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors">{type}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Methodology Panel */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-4 text-slate-300 font-semibold">
+          <Microscope className="w-4 h-4" />
+          <span>Methodology</span>
+        </div>
+        <div className="space-y-2">
+          {Object.values(Methodology).map((methodology) => (
+            <label key={methodology} className="flex items-center gap-3 cursor-pointer group">
+              <div className="relative flex items-center">
+                <input 
+                  type="checkbox" 
+                  className="peer h-4 w-4 appearance-none rounded border border-slate-600 bg-slate-900 checked:bg-pink-500 checked:border-pink-500 transition-colors"
+                  checked={activeMethodologies.includes(methodology)}
+                  onChange={() => toggleMethodology(methodology)}
+                />
+                <CheckIcon className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" />
+              </div>
+              <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors">{methodology}</span>
             </label>
           ))}
         </div>

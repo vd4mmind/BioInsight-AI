@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PaperData, PublicationType, StudyType, Methodology, ResearchModality } from '../types';
-import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna } from 'lucide-react';
+import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check } from 'lucide-react';
 
 interface PaperCardProps {
   paper: PaperData;
@@ -8,12 +8,26 @@ interface PaperCardProps {
 
 export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  
   const isPreprint = paper.publicationType === PublicationType.Preprint;
   
   const getValidationColor = (score: number) => {
     if (score >= 90) return 'text-green-400 border-green-400/30 bg-green-400/10';
     if (score >= 75) return 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10';
     return 'text-red-400 border-red-400/30 bg-red-400/10';
+  };
+
+  const handleCopyLink = async () => {
+    if (paper.url) {
+      try {
+        await navigator.clipboard.writeText(paper.url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy link', err);
+      }
+    }
   };
 
   return (
@@ -36,10 +50,22 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
                 </span>
             </div>
 
-            {/* Title */}
-            <h3 className="text-lg font-bold text-slate-100 leading-snug group-hover:text-blue-400 transition-colors cursor-pointer">
-                {paper.title}
-            </h3>
+            {/* Title - CLICKABLE LINK */}
+            {paper.url ? (
+                 <a 
+                    href={paper.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-lg font-bold text-slate-100 leading-snug hover:text-blue-400 transition-colors cursor-pointer decoration-blue-400/20 hover:decoration-blue-400 underline-offset-4"
+                 >
+                    {paper.title} <ExternalLink className="inline w-3.5 h-3.5 ml-1 opacity-50 mb-1" />
+                 </a>
+            ) : (
+                <h3 className="text-lg font-bold text-slate-100 leading-snug group-hover:text-blue-400 transition-colors cursor-pointer">
+                    {paper.title}
+                </h3>
+            )}
+
 
             {/* Meta Info */}
             <div className="text-xs text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono">
@@ -158,7 +184,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
                 <span className="text-[8px] uppercase font-bold">Score</span>
             </div>
             
-            <div className="flex flex-col items-end gap-2">
+            <div className="flex flex-col items-end gap-2 md:mt-auto">
                 {paper.methodology === Methodology.AIML && (
                     <div className="flex items-center gap-1 text-xs text-fuchsia-400 bg-fuchsia-400/10 px-2 py-1 rounded-full border border-fuchsia-400/20">
                         <FlaskConical className="w-3 h-3" />
@@ -167,18 +193,27 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
                 )}
                 
                 {paper.url && (
-                    <a 
-                        href={paper.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 underline decoration-blue-400/30 hover:decoration-blue-300 md:mt-auto"
-                    >
-                        Read Source <ExternalLink className="w-3 h-3" />
-                    </a>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleCopyLink}
+                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-green-400 transition-colors group/btn"
+                            title="Copy Link"
+                        >
+                            {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Link2 className="w-3.5 h-3.5 group-hover/btn:text-green-400" />}
+                            {copied && <span className="hidden md:inline text-[10px] text-green-400 font-medium">Copied</span>}
+                        </button>
+                        <a 
+                            href={paper.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 underline decoration-blue-400/30 hover:decoration-blue-300"
+                        >
+                            Read Source <ExternalLink className="w-3 h-3" />
+                        </a>
+                    </div>
                 )}
             </div>
         </div>
       </div>
     </div>
   );
-};

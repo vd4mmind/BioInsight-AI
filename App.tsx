@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { PaperCard } from './components/PaperCard';
 import { StatCard } from './components/StatCard';
 import { TrackerStack } from './components/TrackerStack';
-import { PaperData, DiseaseTopic, PublicationType, StudyType } from './types';
+import { PaperData, DiseaseTopic, PublicationType, StudyType, Methodology } from './types';
 import { INITIAL_PAPERS, APP_NAME, APP_VERSION } from './constants';
 import { fetchLiteratureAnalysis } from './services/geminiService';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -15,8 +15,10 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [activeTopics, setActiveTopics] = useState<DiseaseTopic[]>(Object.values(DiseaseTopic));
   const [activeStudyTypes, setActiveStudyTypes] = useState<StudyType[]>(Object.values(StudyType));
+  const [activeMethodologies, setActiveMethodologies] = useState<Methodology[]>(Object.values(Methodology));
   const [showPreprintsOnly, setShowPreprintsOnly] = useState<boolean>(false);
   const [only2025, setOnly2025] = useState<boolean>(true);
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   // Filter papers logic
@@ -24,15 +26,24 @@ const App: React.FC = () => {
     return papers.filter(paper => {
       const topicMatch = activeTopics.includes(paper.topic);
       const studyTypeMatch = activeStudyTypes.includes(paper.studyType);
+      const methodologyMatch = activeMethodologies.includes(paper.methodology);
       const preprintMatch = showPreprintsOnly ? paper.publicationType === PublicationType.Preprint : true;
       
-      // Client side date filter as fallback, mainly filtering data coming from initial fetch
-      const date = new Date(paper.date);
-      const yearMatch = only2025 ? date.getFullYear() === 2025 : true;
+      // Date Logic
+      const paperDate = new Date(paper.date);
+      
+      // 2025 Toggle
+      const yearMatch = only2025 ? paperDate.getFullYear() === 2025 : true;
 
-      return topicMatch && studyTypeMatch && preprintMatch && yearMatch;
+      // Custom Range Logic
+      // If start date is set, paper date must be >= start date
+      const startMatch = dateRange.start ? paperDate >= new Date(dateRange.start) : true;
+      // If end date is set, paper date must be <= end date
+      const endMatch = dateRange.end ? paperDate <= new Date(dateRange.end) : true;
+
+      return topicMatch && studyTypeMatch && methodologyMatch && preprintMatch && yearMatch && startMatch && endMatch;
     });
-  }, [papers, activeTopics, activeStudyTypes, showPreprintsOnly, only2025]);
+  }, [papers, activeTopics, activeStudyTypes, activeMethodologies, showPreprintsOnly, only2025, dateRange]);
 
   // Stats calculation
   const stats = useMemo(() => {
@@ -82,6 +93,12 @@ const App: React.FC = () => {
   const toggleStudyType = (type: StudyType) => {
     setActiveStudyTypes(prev => 
       prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+  };
+
+  const toggleMethodology = (methodology: Methodology) => {
+    setActiveMethodologies(prev => 
+      prev.includes(methodology) ? prev.filter(m => m !== methodology) : [...prev, methodology]
     );
   };
 
@@ -144,10 +161,14 @@ const App: React.FC = () => {
             toggleTopic={toggleTopic}
             activeStudyTypes={activeStudyTypes}
             toggleStudyType={toggleStudyType}
+            activeMethodologies={activeMethodologies}
+            toggleMethodology={toggleMethodology}
             showPreprintsOnly={showPreprintsOnly}
             togglePreprints={() => setShowPreprintsOnly(!showPreprintsOnly)}
             only2025={only2025}
             toggle2025={() => setOnly2025(!only2025)}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
           />
 
           {/* Main Feed Area */}
@@ -201,7 +222,9 @@ const App: React.FC = () => {
                 {filteredPapers.length === 0 ? (
                     <div className="text-center py-20 border-2 border-dashed border-slate-700 rounded-xl">
                         <p className="text-slate-400">No papers match current filters.</p>
-                        {only2025 && <p className="text-xs text-slate-500 mt-2">Try disabling the strict 2025 filter.</p>}
+                        {(only2025 || dateRange.start || dateRange.end) && (
+                            <p className="text-xs text-slate-500 mt-2">Try relaxing your date filters.</p>
+                        )}
                     </div>
                 ) : (
                     filteredPapers.map(paper => (
