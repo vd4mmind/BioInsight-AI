@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PaperData, PublicationType, StudyType, Methodology, ResearchModality } from '../types';
-import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check } from 'lucide-react';
+import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Activity, Biohazard } from 'lucide-react';
 
 interface PaperCardProps {
   paper: PaperData;
@@ -17,6 +17,37 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
     if (score >= 75) return 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10';
     return 'text-red-400 border-red-400/30 bg-red-400/10';
   };
+
+  const getModalityConfig = (modality: ResearchModality) => {
+    switch (modality) {
+      case ResearchModality.InVitro:
+        return { 
+            icon: FlaskConical, 
+            colorClass: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20', 
+            iconColor: 'text-cyan-400' 
+        };
+      case ResearchModality.InVivo:
+        return { 
+            icon: Biohazard, 
+            colorClass: 'text-rose-300 bg-rose-500/10 border-rose-500/20', 
+            iconColor: 'text-rose-400' 
+        };
+      case ResearchModality.Imaging:
+        return { 
+            icon: Layers, 
+            colorClass: 'text-amber-300 bg-amber-500/10 border-amber-500/20', 
+            iconColor: 'text-amber-400' 
+        };
+      default:
+        return { 
+            icon: Dna, 
+            colorClass: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20', 
+            iconColor: 'text-indigo-400' 
+        };
+    }
+  };
+
+  const { icon: ModalityIcon, colorClass: modalityClass, iconColor: modalityIconColor } = getModalityConfig(paper.modality);
 
   const handleCopyLink = async () => {
     if (paper.url) {
@@ -99,9 +130,9 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
                         <span className="text-teal-300 font-mono">{paper.drugAndTarget}</span>
                      </div>
                      <div className="flex items-center gap-2 text-xs">
-                        <Dna className="w-3.5 h-3.5 text-indigo-400" />
+                        <ModalityIcon className={`w-3.5 h-3.5 ${modalityIconColor}`} />
                         <span className="text-slate-400">Modality:</span>
-                        <span className="text-indigo-300 px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">{paper.modality}</span>
+                        <span className={`${modalityClass} px-1.5 py-0.5 rounded border`}>{paper.modality}</span>
                      </div>
                 </div>
                 
@@ -217,3 +248,4 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
       </div>
     </div>
   );
+};

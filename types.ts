@@ -37,6 +37,8 @@ export enum ResearchModality {
   EHR = 'EHR',
   Imaging = 'Imaging',
   ClinicalData = 'Clinical Data',
+  InVitro = 'In-vitro',
+  InVivo = 'In-vivo',
   Other = 'Other'
 }
 
