@@ -88,11 +88,18 @@ const App: React.FC = () => {
     await new Promise(r => setTimeout(r, 800));
 
     // Pass active filters to the API to ensure relevant discovery
-    // If all topics are selected (or none), we pass empty array for "Broad Search"
+    // If all options are selected (or none), we pass empty array for "Broad Search"
+    
     const isAllTopicsSelected = activeTopics.length === Object.values(DiseaseTopic).length;
     const searchTopics = isAllTopicsSelected ? [] : activeTopics;
 
-    const newPapers = await fetchLiteratureAnalysis([], searchTopics);
+    const isAllStudyTypesSelected = activeStudyTypes.length === Object.values(StudyType).length;
+    const searchStudyTypes = isAllStudyTypesSelected ? [] : activeStudyTypes;
+
+    const isAllMethodologiesSelected = activeMethodologies.length === Object.values(Methodology).length;
+    const searchMethodologies = isAllMethodologiesSelected ? [] : activeMethodologies;
+
+    const newPapers = await fetchLiteratureAnalysis([], searchTopics, searchStudyTypes, searchMethodologies);
     
     if (newPapers.length > 0) {
         setLivePapers(prev => {
@@ -239,7 +246,7 @@ const App: React.FC = () => {
                         <Radio className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                         <p className="text-slate-300 font-medium">Ready to scan live sources.</p>
                         <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                            Click "Fetch Latest Papers" to trigger the AI agent to search Google, PubMed, and BioRxiv for papers published in the last 30 days.
+                            Click "Fetch Latest Papers" to trigger the AI agent to search Google, PubMed, and BioRxiv for papers published in the last 30 days based on your current filters.
                         </p>
                     </div>
                 )}

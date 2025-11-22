@@ -32,7 +32,12 @@ const parseJSON = (text: string): any => {
   return null;
 };
 
-export const fetchLiteratureAnalysis = async (existingIds: string[], activeTopics: string[] = []): Promise<PaperData[]> => {
+export const fetchLiteratureAnalysis = async (
+  existingIds: string[], 
+  activeTopics: string[] = [], 
+  activeStudyTypes: string[] = [],
+  activeMethodologies: string[] = []
+): Promise<PaperData[]> => {
   try {
     const modelId = "gemini-2.5-flash"; 
     
@@ -43,14 +48,28 @@ export const fetchLiteratureAnalysis = async (existingIds: string[], activeTopic
     const dateString = pastDate.toISOString().split('T')[0];
 
     // Dynamic Context Building
-    // If user has selected specific topics in UI, prioritize those. Otherwise use all.
+    // If specific filters are passed, prioritize them. If empty, it means "All" or "Broad".
+    
     const targetTopics = activeTopics.length > 0 
         ? activeTopics.join(', ') 
         : Object.values(DiseaseTopic).join(', ');
 
-    const methodologies = Object.values(Methodology).join(', ');
-    const studyTypes = Object.values(StudyType).join(', ');
-    const modalities = Object.values(ResearchModality).join(', ');
+    const targetStudyTypes = activeStudyTypes.length > 0 
+        ? activeStudyTypes.join(', ')
+        : "Clinical Trials, Pre-clinical studies, Real-world Evidence";
+
+    // Expand "Lab Experimental" to be more descriptive for the search agent
+    const expandedMethodologies = activeMethodologies.length > 0
+        ? activeMethodologies.map(m => 
+            m === Methodology.LabExperimental 
+              ? "Lab Experimental (specifically in-vivo, in-vitro, animal models, organoids, cellular models)" 
+              : m
+          )
+        : ["AI/ML", "Statistical Analysis", "Lab Experimental (in-vivo, in-vitro, animal models, organoids)"];
+
+    const targetMethodologies = expandedMethodologies.join(', ');
+
+    const allModalities = Object.values(ResearchModality).join(', ');
 
     // ---------------------------------------------------------
     // PHASE 1: LIVE DISCOVERY WITH GROUNDING
@@ -60,24 +79,28 @@ export const fetchLiteratureAnalysis = async (existingIds: string[], activeTopic
       
       TASK: Search for the VERY LATEST scientific papers and preprints published or appearing online since ${dateString} (Last 30 Days).
       
-      TARGET TOPICS (Prioritize these): ${targetTopics}
-      
-      REQUIRED SEARCH DIMENSIONS:
-      1. Check for specific Methodologies: ${methodologies}
-      2. Check for specific Study Types: ${studyTypes}
-      3. Check for specific Modalities: ${modalities}
+      SEARCH CRITERIA (Strictly prioritize these intersections):
+      1. DISEASE TOPICS: ${targetTopics}
+      2. STUDY DESIGNS: ${targetStudyTypes}
+      3. METHODOLOGIES: ${targetMethodologies}
 
       SOURCES: 
-      - Major Journals: NEJM, Lancet, Nature, Cell, JAMA.
+      - Major Journals: NEJM, Lancet, Nature, Cell, JAMA, Circulation, Hepatology.
       - Preprint Servers (CRITICAL): BioRxiv, MedRxiv.
       - Databases: PubMed, Google Scholar.
 
       INSTRUCTIONS:
-      1. Use the Google Search tool to find at least 5-7 distinct new papers or preprints. 
-      2. You MUST look for specific intersections, for example: "Multi-omics in CKD", "In-vivo imaging in NASH", "AI/ML in Diabetes".
-      3. Ensure you capture PREPRINTS (BioRxiv/MedRxiv) to reflect the latest research, not just established journals.
-      4. Briefly summarize what you found in natural language (Chain of Thought).
-      5. AFTER your summary, provide a strictly formatted JSON array inside a \`\`\`json\`\`\` code block.
+      1. Use the Google Search tool to find at least 5-7 distinct new papers or preprints.
+      2. STRATEGY: Search for the specific combination of Topic + Study Type + Methodology. 
+         - Example: "New AI/ML methods in CKD research last month"
+         - Example: "Clinical trials for MASH/NASH published recently"
+         - Example: "Single cell sequencing CVD preprints 2024"
+         - Example: "In-vivo organoid models for diabetes research 2024"
+         - Example: "New animal models for obesity studies recent"
+      3. If specific intersections (e.g., "AI/ML in NASH") yield few results, broaden to the Disease Topic generally, but prioritize the user's requested Methodology.
+      4. Ensure you capture PREPRINTS (BioRxiv/MedRxiv) to reflect the latest research.
+      5. Briefly summarize what you found in natural language (Chain of Thought).
+      6. AFTER your summary, provide a strictly formatted JSON array inside a \`\`\`json\`\`\` code block.
 
       JSON Structure (Array of Objects):
       - title: string (Exact title)
@@ -86,12 +109,12 @@ export const fetchLiteratureAnalysis = async (existingIds: string[], activeTopic
       - authors: string[] (First 3 authors)
       - topic: string (Must be one of: ${Object.values(DiseaseTopic).join(', ')})
       - publicationType: string (Preprint, Peer Reviewed)
-      - studyType: string (Must be one of: ${studyTypes})
-      - methodology: string (Must be one of: ${methodologies})
-      - modality: string (Must be one of: ${modalities})
+      - studyType: string (Best fit from: ${Object.values(StudyType).join(', ')})
+      - methodology: string (Best fit from: ${Object.values(Methodology).join(', ')})
+      - modality: string (Best fit from: ${allModalities})
       - abstractHighlight: string (1 sentence finding)
       - drugAndTarget: string (e.g. "Target: GLP-1, Drug: Semaglutide" or "N/A")
-      - context: string (Why is this specific paper exciting?)
+      - context: string (Why is this specific paper exciting regarding the search criteria?)
       - validationScore: 100
       - url: string (Web Link if available)
     `;
