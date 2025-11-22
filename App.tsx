@@ -8,7 +8,7 @@ import { PaperData, DiseaseTopic, PublicationType } from './types';
 import { INITIAL_PAPERS, APP_NAME, APP_VERSION } from './constants';
 import { fetchLiteratureAnalysis } from './services/geminiService';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { RefreshCw, BookOpen, Activity, FlaskConical, Database } from 'lucide-react';
+import { RefreshCw, BookOpen, Activity, FlaskConical, Database, FileCheck, FileClock } from 'lucide-react';
 
 const App: React.FC = () => {
   const [papers, setPapers] = useState<PaperData[]>(INITIAL_PAPERS);
@@ -92,12 +92,24 @@ const App: React.FC = () => {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Dashboard Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
             <StatCard 
                 label="Total Tracked" 
                 value={stats.total} 
                 icon={<Database className="w-5 h-5 text-blue-400" />}
                 trend="+12 today"
+            />
+            <StatCard 
+                label="Peer Reviewed" 
+                value={stats.peerReviewed} 
+                icon={<FileCheck className="w-5 h-5 text-green-400" />}
+                colorClass="text-green-400"
+            />
+             <StatCard 
+                label="Preprints" 
+                value={stats.preprints} 
+                icon={<FileClock className="w-5 h-5 text-amber-400" />}
+                colorClass="text-amber-400"
             />
             <StatCard 
                 label="Clinical Trials" 
