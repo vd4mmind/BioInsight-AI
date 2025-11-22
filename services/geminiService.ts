@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { PaperData, DiseaseTopic, Methodology, StudyType, ResearchModality } from "../types";
+import { PaperData, DiseaseTopic, Methodology, StudyType, ResearchModality, PublicationType } from "../types";
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -70,6 +70,7 @@ export const fetchLiteratureAnalysis = async (
     const targetMethodologies = expandedMethodologies.join(', ');
 
     const allModalities = Object.values(ResearchModality).join(', ');
+    const allPubTypes = Object.values(PublicationType).join(', ');
 
     // ---------------------------------------------------------
     // PHASE 1: LIVE DISCOVERY WITH GROUNDING
@@ -77,7 +78,7 @@ export const fetchLiteratureAnalysis = async (
     const discoveryPrompt = `
       You are a scientific literature intelligence agent.
       
-      TASK: Search for the VERY LATEST scientific papers and preprints published or appearing online since ${dateString} (Last 30 Days).
+      TASK: Search for the VERY LATEST scientific papers, preprints, and reputable news analysis published or appearing online since ${dateString} (Last 30 Days).
       
       SEARCH CRITERIA (Strictly prioritize these intersections):
       1. DISEASE TOPICS: ${targetTopics}
@@ -88,33 +89,31 @@ export const fetchLiteratureAnalysis = async (
       - Major Journals: NEJM, Lancet, Nature, Cell, JAMA, Circulation, Hepatology.
       - Preprint Servers (CRITICAL): BioRxiv, MedRxiv.
       - Databases: PubMed, Google Scholar.
+      - Reputable Science News: StatNews, Nature News, ScienceDaily (Only if direct paper not found).
 
       INSTRUCTIONS:
-      1. Use the Google Search tool to find at least 5-7 distinct new papers or preprints.
-      2. STRATEGY: Search for the specific combination of Topic + Study Type + Methodology. 
-         - Example: "New AI/ML methods in CKD research last month"
-         - Example: "Clinical trials for MASH/NASH published recently"
-         - Example: "Single cell sequencing CVD preprints 2024"
-         - Example: "In-vivo organoid models for diabetes research 2024"
-         - Example: "New animal models for obesity studies recent"
-      3. If specific intersections (e.g., "AI/ML in NASH") yield few results, broaden to the Disease Topic generally, but prioritize the user's requested Methodology.
-      4. Ensure you capture PREPRINTS (BioRxiv/MedRxiv) to reflect the latest research.
+      1. Use the Google Search tool to find at least 5-7 distinct new items.
+      2. **DETERMINISM RULE**: Use the EXACT TITLE from the search result link. Do not hallucinate or rewrite titles to sound better.
+      3. **SOURCE CLASSIFICATION**:
+         - If the link is a direct study (PubMed, DOI, Journal, BioRxiv), type is 'Peer Reviewed' or 'Preprint'.
+         - If the link is a news article (e.g., "New study shows..."), type MUST be 'News/Analysis' and the title must match the news headline.
+      4. STRATEGY: Search for the specific combination of Topic + Study Type + Methodology. 
       5. Briefly summarize what you found in natural language (Chain of Thought).
       6. AFTER your summary, provide a strictly formatted JSON array inside a \`\`\`json\`\`\` code block.
 
       JSON Structure (Array of Objects):
-      - title: string (Exact title)
-      - journalOrConference: string (Source Name)
+      - title: string (EXACT title from source)
+      - journalOrConference: string (Source Name, e.g., "Nature", "BioRxiv", or "StatNews")
       - date: string (YYYY-MM-DD)
-      - authors: string[] (First 3 authors)
+      - authors: string[] (First 3 authors if available, else Organization name)
       - topic: string (Must be one of: ${Object.values(DiseaseTopic).join(', ')})
-      - publicationType: string (Preprint, Peer Reviewed)
+      - publicationType: string (Must be one of: ${allPubTypes})
       - studyType: string (Best fit from: ${Object.values(StudyType).join(', ')})
       - methodology: string (Best fit from: ${Object.values(Methodology).join(', ')})
       - modality: string (Best fit from: ${allModalities})
       - abstractHighlight: string (1 sentence finding)
       - drugAndTarget: string (e.g. "Target: GLP-1, Drug: Semaglutide" or "N/A")
-      - context: string (Why is this specific paper exciting regarding the search criteria?)
+      - context: string (Why is this specifically relevant?)
       - validationScore: 100
       - url: string (Web Link if available)
     `;
@@ -123,7 +122,7 @@ export const fetchLiteratureAnalysis = async (
       model: modelId,
       contents: discoveryPrompt,
       config: {
-        temperature: 0.4, // Slightly higher for diverse discovery
+        temperature: 0.3, // Lower temperature for more deterministic output
         tools: [{ googleSearch: {} }], // Live Search Enabled
       }
     });
@@ -143,25 +142,46 @@ export const fetchLiteratureAnalysis = async (
         const chunks = discoveryResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
         
         if (chunks && chunks.length > 0) {
-            // Search for a chunk that matches the paper title
-            const relevantChunk = chunks.find((c: any) => 
-                c.web?.uri && (
-                    c.web.title?.toLowerCase().includes(paper.title.substring(0, 15).toLowerCase()) || 
-                    paper.title.toLowerCase().includes(c.web.title?.toLowerCase())
-                )
-            );
+            // Search for a chunk that matches the paper title strongly
+            // Normalized comparison to avoid case/punctuation mismatches
+            const normalize = (s: string) => s?.toLowerCase().replace(/[^a-z0-9]/g, "") || "";
+            const paperTitleNorm = normalize(paper.title);
+
+            const relevantChunk = chunks.find((c: any) => {
+                const chunkTitleNorm = normalize(c.web?.title);
+                return c.web?.uri && (
+                    chunkTitleNorm.includes(paperTitleNorm) || 
+                    paperTitleNorm.includes(chunkTitleNorm)
+                );
+            });
 
             if (relevantChunk) {
                 groundingUrl = relevantChunk.web.uri;
-            } else if (!paper.url) {
-                // Fallback to first chunk if no URL provided in JSON
-                groundingUrl = chunks[0].web?.uri;
+                // OPTIONAL: Enforce title consistency if the AI title seems very different
+                // But usually, we trust the AI's extraction if the prompt is strict.
+            } else if (!paper.url && chunks.length > 0) {
+                // Fallback: If no URL is set, and we can't match titles perfect, 
+                // but the AI returned items in order, we might sometimes want to guess, 
+                // but strictly it's better to have no link than a wrong one.
+                // However, often the first chunk corresponds to the first finding.
+                // Let's leave it empty if no match to be deterministic/safe.
+            }
+        }
+
+        // Final Safety Check for News vs Paper
+        let finalPubType = paper.publicationType;
+        if (groundingUrl) {
+            const newsDomains = ['nytimes.com', 'statnews.com', 'medicalxpress.com', 'sciencedaily.com', 'forbes.com', 'bloomberg.com'];
+            const isNewsDomain = newsDomains.some(d => groundingUrl.includes(d));
+            if (isNewsDomain) {
+                finalPubType = PublicationType.News;
             }
         }
 
         return {
             ...paper,
             id: Math.random().toString(36).substring(2, 15),
+            publicationType: finalPubType,
             authorsVerified: true, // Grounding assumes verified
             url: groundingUrl
         };

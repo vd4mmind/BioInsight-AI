@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PaperData, PublicationType, StudyType, Methodology, ResearchModality } from '../types';
-import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Activity, Biohazard } from 'lucide-react';
+import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Activity, Biohazard, Newspaper } from 'lucide-react';
 
 interface PaperCardProps {
   paper: PaperData;
@@ -11,6 +11,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
   const [copied, setCopied] = useState(false);
   
   const isPreprint = paper.publicationType === PublicationType.Preprint;
+  const isNews = paper.publicationType === PublicationType.News;
   
   const getValidationColor = (score: number) => {
     if (score >= 90) return 'text-green-400 border-green-400/30 bg-green-400/10';
@@ -61,6 +62,12 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
     }
   };
 
+  const getTypeStyles = () => {
+      if (isPreprint) return 'text-amber-400 border-amber-400/30 bg-amber-400/10';
+      if (isNews) return 'text-orange-400 border-orange-400/30 bg-orange-400/10';
+      return 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10';
+  };
+
   return (
     <div className="bg-slate-800 border-l-4 border-l-blue-500 border-y border-r border-slate-700 rounded-r-xl p-5 mb-4 hover:bg-slate-800/80 transition-all duration-200 shadow-lg shadow-black/20 group relative overflow-hidden">
         {/* Background decorative element */}
@@ -70,7 +77,8 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
         <div className="flex-1 space-y-3 w-full">
             {/* Header Row: Type & Tags */}
             <div className="flex flex-wrap items-center gap-2 mb-1">
-                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${isPreprint ? 'text-amber-400 border-amber-400/30 bg-amber-400/10' : 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10'}`}>
+                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border flex items-center gap-1 ${getTypeStyles()}`}>
+                    {isNews && <Newspaper className="w-3 h-3" />}
                     {paper.publicationType}
                 </span>
                 <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border text-slate-300 border-slate-600 bg-slate-700/50">
@@ -101,7 +109,8 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
             {/* Meta Info */}
             <div className="text-xs text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono">
                 <span className="flex items-center gap-1">
-                    <FileText className="w-3 h-3" /> {paper.journalOrConference}
+                    {isNews ? <Newspaper className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                    {paper.journalOrConference}
                 </span>
                 <span className="text-slate-600">|</span>
                 <span>{paper.date}</span>
@@ -239,7 +248,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 underline decoration-blue-400/30 hover:decoration-blue-300"
                         >
-                            Read Source <ExternalLink className="w-3 h-3" />
+                            {isNews ? 'Read Article' : 'Read Source'} <ExternalLink className="w-3 h-3" />
                         </a>
                     </div>
                 )}

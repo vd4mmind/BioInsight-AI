@@ -10,7 +10,8 @@ export enum DiseaseTopic {
 
 export enum PublicationType {
   Preprint = 'Preprint',
-  PeerReviewed = 'Peer Reviewed'
+  PeerReviewed = 'Peer Reviewed',
+  News = 'News/Analysis'
 }
 
 export enum StudyType {
