@@ -87,7 +87,12 @@ const App: React.FC = () => {
     // Simulate "Checking sources..." delay for UX
     await new Promise(r => setTimeout(r, 800));
 
-    const newPapers = await fetchLiteratureAnalysis([]);
+    // Pass active filters to the API to ensure relevant discovery
+    // If all topics are selected (or none), we pass empty array for "Broad Search"
+    const isAllTopicsSelected = activeTopics.length === Object.values(DiseaseTopic).length;
+    const searchTopics = isAllTopicsSelected ? [] : activeTopics;
+
+    const newPapers = await fetchLiteratureAnalysis([], searchTopics);
     
     if (newPapers.length > 0) {
         setLivePapers(prev => {

@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { PaperData } from "../types";
+import { PaperData, DiseaseTopic, Methodology, StudyType, ResearchModality } from "../types";
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -32,7 +32,7 @@ const parseJSON = (text: string): any => {
   return null;
 };
 
-export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<PaperData[]> => {
+export const fetchLiteratureAnalysis = async (existingIds: string[], activeTopics: string[] = []): Promise<PaperData[]> => {
   try {
     const modelId = "gemini-2.5-flash"; 
     
@@ -42,39 +42,56 @@ export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<Pa
     pastDate.setDate(today.getDate() - 30);
     const dateString = pastDate.toISOString().split('T')[0];
 
+    // Dynamic Context Building
+    // If user has selected specific topics in UI, prioritize those. Otherwise use all.
+    const targetTopics = activeTopics.length > 0 
+        ? activeTopics.join(', ') 
+        : Object.values(DiseaseTopic).join(', ');
+
+    const methodologies = Object.values(Methodology).join(', ');
+    const studyTypes = Object.values(StudyType).join(', ');
+    const modalities = Object.values(ResearchModality).join(', ');
+
     // ---------------------------------------------------------
     // PHASE 1: LIVE DISCOVERY WITH GROUNDING
     // ---------------------------------------------------------
-    // NOTE: We allow the model to "think" in text first before outputting JSON.
-    // This prevents 'Rpc failed' errors caused by forcing Search Grounding 
-    // to output strict JSON immediately without context.
     const discoveryPrompt = `
       You are a scientific literature intelligence agent.
       
       TASK: Search for the VERY LATEST scientific papers and preprints published or appearing online since ${dateString} (Last 30 Days).
       
-      TOPICS: CVD, ASCVD, Heart Failure, CKD, MASH, NASH, Diabetes, Obesity.
-      FOCUS: AI/ML applications, Single-cell/Multi-omics, Imaging, Novel drug targets.
-      SOURCES: PubMed, BioRxiv, MedRxiv, Nature, Cell, NEJM, Lancet, Google Scholar.
+      TARGET TOPICS (Prioritize these): ${targetTopics}
+      
+      REQUIRED SEARCH DIMENSIONS:
+      1. Check for specific Methodologies: ${methodologies}
+      2. Check for specific Study Types: ${studyTypes}
+      3. Check for specific Modalities: ${modalities}
+
+      SOURCES: 
+      - Major Journals: NEJM, Lancet, Nature, Cell, JAMA.
+      - Preprint Servers (CRITICAL): BioRxiv, MedRxiv.
+      - Databases: PubMed, Google Scholar.
 
       INSTRUCTIONS:
-      1. Use the Google Search tool to find at least 3 distinct new papers or preprints published in the last 30 days.
-      2. Briefly summarize what you found in natural language (to verify citations).
-      3. AFTER your summary, provide a strictly formatted JSON array inside a \`\`\`json\`\`\` code block.
+      1. Use the Google Search tool to find at least 5-7 distinct new papers or preprints. 
+      2. You MUST look for specific intersections, for example: "Multi-omics in CKD", "In-vivo imaging in NASH", "AI/ML in Diabetes".
+      3. Ensure you capture PREPRINTS (BioRxiv/MedRxiv) to reflect the latest research, not just established journals.
+      4. Briefly summarize what you found in natural language (Chain of Thought).
+      5. AFTER your summary, provide a strictly formatted JSON array inside a \`\`\`json\`\`\` code block.
 
       JSON Structure (Array of Objects):
       - title: string (Exact title)
-      - journalOrConference: string (Source)
+      - journalOrConference: string (Source Name)
       - date: string (YYYY-MM-DD)
       - authors: string[] (First 3 authors)
-      - topic: string (CVD, CKD, MASH, NASH, MASLD, Diabetes, Obesity)
+      - topic: string (Must be one of: ${Object.values(DiseaseTopic).join(', ')})
       - publicationType: string (Preprint, Peer Reviewed)
-      - studyType: string (Clinical Trial, Pre-clinical, Simulated, Human Cohort)
-      - methodology: string (AI/ML, Lab Experimental, Statistical)
-      - modality: string (Single Cell, Multi-omics, Imaging, Clinical Data, In-vitro, In-vivo)
+      - studyType: string (Must be one of: ${studyTypes})
+      - methodology: string (Must be one of: ${methodologies})
+      - modality: string (Must be one of: ${modalities})
       - abstractHighlight: string (1 sentence finding)
-      - drugAndTarget: string
-      - context: string (Why is this exciting?)
+      - drugAndTarget: string (e.g. "Target: GLP-1, Drug: Semaglutide" or "N/A")
+      - context: string (Why is this specific paper exciting?)
       - validationScore: 100
       - url: string (Web Link if available)
     `;
@@ -83,7 +100,7 @@ export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<Pa
       model: modelId,
       contents: discoveryPrompt,
       config: {
-        temperature: 0.1,
+        temperature: 0.4, // Slightly higher for diverse discovery
         tools: [{ googleSearch: {} }], // Live Search Enabled
       }
     });
