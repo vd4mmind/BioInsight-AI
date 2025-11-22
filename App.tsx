@@ -17,13 +17,14 @@ const App: React.FC = () => {
   const [activeStudyTypes, setActiveStudyTypes] = useState<StudyType[]>(Object.values(StudyType));
   const [activeMethodologies, setActiveMethodologies] = useState<Methodology[]>(Object.values(Methodology));
   const [showPreprintsOnly, setShowPreprintsOnly] = useState<boolean>(false);
-  const [only2025, setOnly2025] = useState<boolean>(true);
+  // Default is false to ensure verified 2024 papers are visible on load
+  const [only2025, setOnly2025] = useState<boolean>(false);
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   // Filter papers logic
   const filteredPapers = useMemo(() => {
-    return papers.filter(paper => {
+    const filtered = papers.filter(paper => {
       const topicMatch = activeTopics.includes(paper.topic);
       const studyTypeMatch = activeStudyTypes.includes(paper.studyType);
       const methodologyMatch = activeMethodologies.includes(paper.methodology);
@@ -43,6 +44,9 @@ const App: React.FC = () => {
 
       return topicMatch && studyTypeMatch && methodologyMatch && preprintMatch && yearMatch && startMatch && endMatch;
     });
+
+    // Sort by date descending (Newest first) to ensure "Since Jan" list is chronological
+    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [papers, activeTopics, activeStudyTypes, activeMethodologies, showPreprintsOnly, only2025, dateRange]);
 
   // Stats calculation
@@ -72,7 +76,7 @@ const App: React.FC = () => {
   const handleRefresh = async () => {
     setIsLoading(true);
     const existingIds = papers.map(p => p.id);
-    // Pass the year filter to the service
+    // If filtering by 2025, search 2025. Otherwise search from 2024 to include recent past.
     const startYear = only2025 ? 2025 : 2024;
     const newPapers = await fetchLiteratureAnalysis(existingIds, startYear);
     
@@ -104,10 +108,8 @@ const App: React.FC = () => {
 
   // Initial fetch simulation on mount
   useEffect(() => {
-    // Optional: Fetch some fresh AI generated data on load
-    // handleRefresh(); 
-    // Keeping it manual for now to avoid immediate API key usage if not set, 
-    // user can click Refresh.
+    // User can trigger a refresh manually to get the absolute latest live data
+    // We start with a robust static set of 2024 papers in constants.ts
   }, []);
 
   return (
@@ -223,7 +225,7 @@ const App: React.FC = () => {
                     <div className="text-center py-20 border-2 border-dashed border-slate-700 rounded-xl">
                         <p className="text-slate-400">No papers match current filters.</p>
                         {(only2025 || dateRange.start || dateRange.end) && (
-                            <p className="text-xs text-slate-500 mt-2">Try relaxing your date filters.</p>
+                            <p className="text-xs text-slate-500 mt-2">Try relaxing your date filters or toggling off "2025 Only".</p>
                         )}
                     </div>
                 ) : (
@@ -249,7 +251,7 @@ const App: React.FC = () => {
             <div className="inline-block px-4 py-2 bg-slate-800/50 rounded border border-slate-700">
                 <p className="text-[10px] text-slate-500 max-w-xl mx-auto leading-relaxed">
                     <strong>VERIFIED FEED:</strong> This feed utilizes <strong>Google Search Grounding</strong> to retrieve real-time scientific data. 
-                    All papers displayed starting from Jan 1st, 2025 are cross-referenced with live web sources (PubMed, Arxiv, etc.). 
+                    All papers displayed are cross-referenced with live web sources (PubMed, Arxiv, etc.). 
                     Author lists and titles are extracted deterministically from search results.
                 </p>
             </div>

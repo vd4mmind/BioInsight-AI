@@ -43,8 +43,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         
         <label className="flex items-center justify-between cursor-pointer group p-2 rounded bg-slate-900/50 border border-slate-700/50 mb-4">
             <div className="flex flex-col">
-                <span className="text-sm font-medium text-slate-200">Since Jan 1, 2025</span>
-                <span className="text-[10px] text-slate-500">Strict 2025+ Filter</span>
+                <span className="text-sm font-medium text-slate-200">2025 Only</span>
+                <span className="text-[10px] text-slate-500">Filter out 2024 papers</span>
             </div>
             <div className={`w-10 h-5 rounded-full relative transition-colors duration-200 ${only2025 ? 'bg-teal-500' : 'bg-slate-700'}`} onClick={toggle2025}>
                     <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${only2025 ? 'translate-x-5' : 'translate-x-0'}`}></div>
