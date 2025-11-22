@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { PaperCard } from './components/PaperCard';
 import { StatCard } from './components/StatCard';
 import { TrackerStack } from './components/TrackerStack';
-import { PaperData, DiseaseTopic, PublicationType } from './types';
+import { PaperData, DiseaseTopic, PublicationType, StudyType } from './types';
 import { INITIAL_PAPERS, APP_NAME, APP_VERSION } from './constants';
 import { fetchLiteratureAnalysis } from './services/geminiService';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -14,6 +14,7 @@ const App: React.FC = () => {
   const [papers, setPapers] = useState<PaperData[]>(INITIAL_PAPERS);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [activeTopics, setActiveTopics] = useState<DiseaseTopic[]>(Object.values(DiseaseTopic));
+  const [activeStudyTypes, setActiveStudyTypes] = useState<StudyType[]>(Object.values(StudyType));
   const [showPreprintsOnly, setShowPreprintsOnly] = useState<boolean>(false);
   const [only2025, setOnly2025] = useState<boolean>(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -22,15 +23,16 @@ const App: React.FC = () => {
   const filteredPapers = useMemo(() => {
     return papers.filter(paper => {
       const topicMatch = activeTopics.includes(paper.topic);
+      const studyTypeMatch = activeStudyTypes.includes(paper.studyType);
       const preprintMatch = showPreprintsOnly ? paper.publicationType === PublicationType.Preprint : true;
       
       // Client side date filter as fallback, mainly filtering data coming from initial fetch
       const date = new Date(paper.date);
       const yearMatch = only2025 ? date.getFullYear() === 2025 : true;
 
-      return topicMatch && preprintMatch && yearMatch;
+      return topicMatch && studyTypeMatch && preprintMatch && yearMatch;
     });
-  }, [papers, activeTopics, showPreprintsOnly, only2025]);
+  }, [papers, activeTopics, activeStudyTypes, showPreprintsOnly, only2025]);
 
   // Stats calculation
   const stats = useMemo(() => {
@@ -74,6 +76,12 @@ const App: React.FC = () => {
   const toggleTopic = (topic: DiseaseTopic) => {
     setActiveTopics(prev => 
       prev.includes(topic) ? prev.filter(t => t !== topic) : [...prev, topic]
+    );
+  };
+
+  const toggleStudyType = (type: StudyType) => {
+    setActiveStudyTypes(prev => 
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
     );
   };
 
@@ -134,6 +142,8 @@ const App: React.FC = () => {
           <Sidebar 
             activeTopics={activeTopics} 
             toggleTopic={toggleTopic}
+            activeStudyTypes={activeStudyTypes}
+            toggleStudyType={toggleStudyType}
             showPreprintsOnly={showPreprintsOnly}
             togglePreprints={() => setShowPreprintsOnly(!showPreprintsOnly)}
             only2025={only2025}
