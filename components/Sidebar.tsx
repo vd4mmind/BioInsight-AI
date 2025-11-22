@@ -1,23 +1,44 @@
 import React from 'react';
-import { DiseaseTopic, PublicationType, StudyType, OmicsType, Methodology } from '../types';
-import { Filter, ChevronDown } from 'lucide-react';
+import { DiseaseTopic, PublicationType, StudyType, ResearchModality } from '../types';
+import { Filter, ChevronDown, CalendarRange } from 'lucide-react';
 
 interface SidebarProps {
   activeTopics: DiseaseTopic[];
   toggleTopic: (topic: DiseaseTopic) => void;
   showPreprintsOnly: boolean;
   togglePreprints: () => void;
+  only2025: boolean;
+  toggle2025: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
   activeTopics, 
   toggleTopic, 
   showPreprintsOnly, 
-  togglePreprints 
+  togglePreprints,
+  only2025,
+  toggle2025
 }) => {
   return (
     <aside className="w-full lg:w-64 shrink-0 space-y-6 mb-6 lg:mb-0">
       
+      {/* Date Filter */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+         <div className="flex items-center gap-2 mb-3 text-slate-300 font-semibold">
+          <CalendarRange className="w-4 h-4" />
+          <span>Time Range</span>
+        </div>
+        <label className="flex items-center justify-between cursor-pointer group p-2 rounded bg-slate-900/50 border border-slate-700/50">
+            <div className="flex flex-col">
+                <span className="text-sm font-medium text-slate-200">Since Jan 1, 2025</span>
+                <span className="text-[10px] text-slate-500">Strict 2025+ Filter</span>
+            </div>
+            <div className={`w-10 h-5 rounded-full relative transition-colors duration-200 ${only2025 ? 'bg-teal-500' : 'bg-slate-700'}`} onClick={toggle2025}>
+                    <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${only2025 ? 'translate-x-5' : 'translate-x-0'}`}></div>
+            </div>
+        </label>
+      </div>
+
       {/* Topics Panel */}
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
         <div className="flex items-center gap-2 mb-4 text-slate-300 font-semibold">
@@ -55,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                      <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ${showPreprintsOnly ? 'translate-x-5' : 'translate-x-0'}`}></div>
                 </div>
              </label>
-             {/* Visual-only static filters for demo aesthetics */}
+             
              <div className="pt-3 border-t border-slate-700/50 space-y-2 opacity-75">
                 <div className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Study Type</div>
                 {[StudyType.ClinicalTrial, StudyType.PreClinical, StudyType.HumanCohort].map(t => (
@@ -70,7 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="bg-gradient-to-b from-indigo-900/20 to-slate-900 border border-indigo-500/30 rounded-xl p-4">
          <h4 className="text-indigo-300 font-bold text-sm mb-2">Pro Insight</h4>
          <p className="text-xs text-indigo-200/70 mb-3">
-            Trending: Multi-omics in NASH is up 240% this quarter.
+            Trending: Single Cell Transcriptomics in NASH is up 240% this quarter.
          </p>
          <div className="h-1 w-full bg-indigo-900/50 rounded-full overflow-hidden">
             <div className="h-full bg-indigo-500 w-3/4"></div>

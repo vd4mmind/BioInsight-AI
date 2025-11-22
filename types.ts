@@ -26,12 +26,18 @@ export enum Methodology {
   Statistical = 'Statistical'
 }
 
-export enum OmicsType {
-  MultiModal = 'Multi-modal',
-  SingleOmics = 'Single Omics',
-  MultiOmics = 'Multi-omics (>2)',
+export enum ResearchModality {
+  SingleCell = 'Single Cell',
+  Genetics = 'Genetics',
+  Proteomics = 'Proteomics',
+  Transcriptomics = 'Transcriptomics',
+  Metabolomics = 'Metabolomics',
+  Lipidomics = 'Lipidomics',
+  MultiOmics = 'Multi-omics',
+  EHR = 'EHR',
   Imaging = 'Imaging',
-  None = 'None'
+  ClinicalData = 'Clinical Data',
+  Other = 'Other'
 }
 
 export interface PaperData {
@@ -44,7 +50,7 @@ export interface PaperData {
   publicationType: PublicationType;
   studyType: StudyType;
   methodology: Methodology;
-  omicsType: OmicsType;
+  modality: ResearchModality;
   abstractHighlight: string;
   drugAndTarget: string;
   context: string;

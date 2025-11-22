@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { PaperData, PublicationType, StudyType, Methodology, OmicsType } from '../types';
-import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags } from 'lucide-react';
+import { PaperData, PublicationType, StudyType, Methodology, ResearchModality } from '../types';
+import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna } from 'lucide-react';
 
 interface PaperCardProps {
   paper: PaperData;
@@ -73,9 +73,9 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
                         <span className="text-teal-300 font-mono">{paper.drugAndTarget}</span>
                      </div>
                      <div className="flex items-center gap-2 text-xs">
-                        <Layers className="w-3.5 h-3.5 text-indigo-400" />
-                        <span className="text-slate-400">Omics:</span>
-                        <span className="text-indigo-300">{paper.omicsType}</span>
+                        <Dna className="w-3.5 h-3.5 text-indigo-400" />
+                        <span className="text-slate-400">Modality:</span>
+                        <span className="text-indigo-300 px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">{paper.modality}</span>
                      </div>
                 </div>
                 

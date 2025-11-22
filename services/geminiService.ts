@@ -1,76 +1,152 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { DiseaseTopic, Methodology, OmicsType, PaperData, PublicationType, StudyType } from "../types";
+import { GoogleGenAI } from "@google/genai";
+import { PaperData } from "../types";
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<PaperData[]> => {
+// Helper to parse JSON from markdown code blocks or raw text
+const parseJSON = (text: string): any => {
+  const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/```\n([\s\S]*?)\n```/);
+  if (jsonMatch && jsonMatch[1]) {
+    try {
+      return JSON.parse(jsonMatch[1]);
+    } catch (e) {
+      console.error("Failed to parse JSON block:", e);
+    }
+  }
   try {
-    // We request a JSON array of papers. 
-    // We simulate "live" feed by asking for "latest" or "trending" conceptual papers based on real science.
-    
+    return JSON.parse(text);
+  } catch (e) {
+    return null;
+  }
+};
+
+export const fetchLiteratureAnalysis = async (existingIds: string[], startYear: number = 2025): Promise<PaperData[]> => {
+  try {
     const modelId = "gemini-2.5-flash"; 
     
-    const response = await ai.models.generateContent({
+    const dateString = `${startYear}-01-01`;
+
+    // ---------------------------------------------------------
+    // PHASE 1: DISCOVERY
+    // Broad search to find candidates
+    // ---------------------------------------------------------
+    const discoveryPrompt = `
+      You are a scientific literature aggregator. 
+      Your task is to find 3 REAL, AUTHENTIC scientific papers or preprints published AFTER ${dateString}.
+      
+      Topics to search: CVD, CKD, MASH, NASH, MASLD, Diabetes, Obesity.
+      Sources: PubMed, Nature, Lancet, NEJM, BioRxiv, MedRxiv, Arxiv, NeurIPS, CVPR.
+      
+      Strict Requirements:
+      1. DATE: Must be published on or after ${dateString}.
+      2. TITLE: Must be the EXACT deterministic title from the publisher. Do not hallucinate or paraphrase.
+      3. DIVERSITY: Mix clinical trials, AI/ML biology, and basic science.
+
+      Output the result strictly as a JSON array inside a code block (\`\`\`json ... \`\`\`).
+      
+      JSON Object Structure for each paper:
+      - title: string (Exact title found on the web)
+      - journalOrConference: string (e.g., "Nature Medicine", "BioRxiv")
+      - date: string (YYYY-MM-DD, must be >= ${startYear})
+      - authors: string[] (Initial list)
+      - affiliations: string[] (Initial list)
+      - funding: string (Primary sponsor or "N/A")
+      - keywords: string[] (3-5 tags)
+      - topic: string (One of: CVD, CKD, MASH, NASH, MASLD, Diabetes, Obesity)
+      - publicationType: string (One of: "Preprint", "Peer Reviewed")
+      - studyType: string (One of: "Clinical Trial", "Human Cohort (Non-RCT)", "Pre-clinical", "Simulated")
+      - methodology: string (One of: "AI/ML", "Lab Experimental", "Statistical")
+      - modality: string (One of: "Single Cell", "Genetics", "Proteomics", "Transcriptomics", "Metabolomics", "Lipidomics", "Multi-omics", "EHR", "Imaging", "Clinical Data", "Other")
+      - abstractHighlight: string (1 sentence summary)
+      - drugAndTarget: string (e.g., "Target: X, Drug: Y")
+      - context: string (Clinical relevance)
+      - validationScore: number (90-100 for peer reviewed, 80-90 for preprints)
+      - url: string (The direct URL to the paper found in search)
+    `;
+
+    const discoveryResponse = await ai.models.generateContent({
       model: modelId,
-      contents: `Generate 4 unique, realistic scientific literature entries related to these topics: CVD, CKD, MASH, NASH, MASLD, Diabetes, Obesity. 
-      Focus on recent breakthroughs, AI/ML applications in biology, and clinical trial results.
-      Mix of Preprints (BioRxiv/MedRxiv/Arxiv) and Peer Reviewed (Nature, Lancet, NEJM, CVPR, NeurIPS).
-      Ensure the data is technically accurate to current scientific trends.
-      
-      CRITICAL AUTHOR VERIFICATION CHECKPOINT:
-      - Perform a verification check on the authors.
-      - Cross-reference author names with known scientific databases (e.g., PubMed, Google Scholar) or valid institutional affiliations (e.g., Harvard, Broad Institute, Novo Nordisk).
-      - If the paper corresponds to a REAL study with REAL authors, set 'authorsVerified' to TRUE.
-      - If the paper is a generated illustrative example of a trend, or uses generic/simulated names, set 'authorsVerified' to FALSE.
-      - Be strict: If you are unsure if the specific author combo exists for that specific title, set it to FALSE.
-      
-      ADDITIONAL METADATA:
-      - Provide realistic institutional affiliations for the authors.
-      - Provide the primary funding source (e.g., NIH, Welcome Trust, Pharma Company, or N/A).
-      - Provide 3-5 relevant keywords or tags.
-      
-      Do not include IDs that match this list: ${JSON.stringify(existingIds)}.
-      `,
+      contents: discoveryPrompt,
       config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              journalOrConference: { type: Type.STRING },
-              date: { type: Type.STRING, description: "YYYY-MM-DD format, recent dates within last year" },
-              authors: { type: Type.ARRAY, items: { type: Type.STRING } },
-              affiliations: { type: Type.ARRAY, items: { type: Type.STRING }, description: "University or Company names" },
-              funding: { type: Type.STRING, description: "Grant or Sponsor name" },
-              keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Scientific tags" },
-              topic: { type: Type.STRING, enum: Object.values(DiseaseTopic) },
-              publicationType: { type: Type.STRING, enum: Object.values(PublicationType) },
-              studyType: { type: Type.STRING, enum: Object.values(StudyType) },
-              methodology: { type: Type.STRING, enum: Object.values(Methodology) },
-              omicsType: { type: Type.STRING, enum: Object.values(OmicsType) },
-              abstractHighlight: { type: Type.STRING, description: "One line scientific takeaway" },
-              drugAndTarget: { type: Type.STRING, description: "e.g. Target: GLP-1, Drug: Semaglutide" },
-              context: { type: Type.STRING, description: "Why this matters clinically or scientifically" },
-              validationScore: { type: Type.INTEGER, description: "Confidence score 0-100 based on source reliability and clarity" },
-              authorsVerified: { type: Type.BOOLEAN, description: "True ONLY if authors are cross-referenced as real entities linked to this work. False if simulated." },
-              url: { type: Type.STRING, description: "A link to the source if real, or a generic field if simulated" }
-            },
-            required: ["title", "journalOrConference", "date", "topic", "publicationType", "studyType", "methodology", "omicsType", "abstractHighlight", "drugAndTarget", "context", "validationScore", "authorsVerified", "affiliations", "funding", "keywords"]
-          }
-        }
+        temperature: 0, // Max determinism for titles
+        tools: [{ googleSearch: {} }], // Enable Live Search
       }
     });
 
-    const rawData = JSON.parse(response.text || "[]");
+    const rawData = parseJSON(discoveryResponse.text || "");
     
-    // Add client-side IDs
-    return rawData.map((paper: any) => ({
+    if (!Array.isArray(rawData)) {
+        console.warn("Discovery phase returned invalid format");
+        return [];
+    }
+
+    // Hydrate with IDs and set initial verification to false
+    const candidates = rawData.map((paper: any) => ({
       ...paper,
-      id: Math.random().toString(36).substring(2, 15)
+      id: Math.random().toString(36).substring(2, 15),
+      authorsVerified: false // Start unverified
     }));
+
+    // ---------------------------------------------------------
+    // PHASE 2: SECONDARY VERIFICATION
+    // Targeted search for each paper to confirm authors and exact title
+    // ---------------------------------------------------------
+    const verifiedPapers = await Promise.all(candidates.map(async (paper: PaperData) => {
+        // We perform a targeted search for the specific title to verify authors
+        const verificationPrompt = `
+            VERIFICATION TASK:
+            Target Paper: "${paper.title}"
+            
+            Action:
+            1. Search specifically for this paper title.
+            2. Extract the EXACT list of authors.
+            3. Extract the Author Affiliations.
+            4. Confirm the title is 100% accurate to the source. If slight mismatch, correct it.
+
+            Return strictly a JSON object:
+            {
+                "correctTitle": "The exact title found",
+                "authors": ["Author 1", "Author 2", ...],
+                "affiliations": ["Affiliation 1", ...],
+                "verified": boolean (true if paper found and authors confirmed, false otherwise)
+            }
+        `;
+
+        try {
+            const verifyResponse = await ai.models.generateContent({
+                model: modelId,
+                contents: verificationPrompt,
+                config: {
+                    temperature: 0,
+                    tools: [{ googleSearch: {} }]
+                }
+            });
+
+            const verifiedData = parseJSON(verifyResponse.text || "");
+
+            if (verifiedData && verifiedData.verified === true) {
+                // Merge verified data
+                return {
+                    ...paper,
+                    title: verifiedData.correctTitle || paper.title, // Ensure title is deterministic
+                    authors: Array.isArray(verifiedData.authors) && verifiedData.authors.length > 0 ? verifiedData.authors : paper.authors,
+                    affiliations: verifiedData.affiliations || paper.affiliations,
+                    authorsVerified: true
+                };
+            } else {
+                // If verification returned false or failed structure, keep original but mark unverified
+                return { ...paper, authorsVerified: false };
+            }
+
+        } catch (err) {
+            console.warn(`Verification failed for paper: ${paper.title}`, err);
+            // Return original state on error
+            return paper;
+        }
+    }));
+
+    return verifiedPapers;
 
   } catch (error) {
     console.error("Failed to fetch literature from Gemini:", error);
