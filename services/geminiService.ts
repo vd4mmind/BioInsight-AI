@@ -38,9 +38,9 @@ export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<Pa
     
     // Calculate date for "Last 30 Days"
     const today = new Date();
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 30);
-    const dateString = thirtyDaysAgo.toISOString().split('T')[0];
+    const pastDate = new Date(today);
+    pastDate.setDate(today.getDate() - 30);
+    const dateString = pastDate.toISOString().split('T')[0];
 
     // ---------------------------------------------------------
     // PHASE 1: LIVE DISCOVERY WITH GROUNDING
@@ -51,14 +51,14 @@ export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<Pa
     const discoveryPrompt = `
       You are a scientific literature intelligence agent.
       
-      TASK: Search for the LATEST scientific papers and preprints published AFTER ${dateString} (Last 30 days).
+      TASK: Search for the VERY LATEST scientific papers and preprints published or appearing online since ${dateString} (Last 30 Days).
       
       TOPICS: CVD, ASCVD, Heart Failure, CKD, MASH, NASH, Diabetes, Obesity.
       FOCUS: AI/ML applications, Single-cell/Multi-omics, Imaging, Novel drug targets.
-      SOURCES: PubMed, BioRxiv, MedRxiv, Nature, Cell, NEJM, Lancet.
+      SOURCES: PubMed, BioRxiv, MedRxiv, Nature, Cell, NEJM, Lancet, Google Scholar.
 
       INSTRUCTIONS:
-      1. Use the Google Search tool to find at least 3 distinct new papers.
+      1. Use the Google Search tool to find at least 3 distinct new papers or preprints published in the last 30 days.
       2. Briefly summarize what you found in natural language (to verify citations).
       3. AFTER your summary, provide a strictly formatted JSON array inside a \`\`\`json\`\`\` code block.
 
@@ -71,7 +71,7 @@ export const fetchLiteratureAnalysis = async (existingIds: string[]): Promise<Pa
       - publicationType: string (Preprint, Peer Reviewed)
       - studyType: string (Clinical Trial, Pre-clinical, Simulated, Human Cohort)
       - methodology: string (AI/ML, Lab Experimental, Statistical)
-      - modality: string (Single Cell, Multi-omics, Imaging, Clinical Data, etc.)
+      - modality: string (Single Cell, Multi-omics, Imaging, Clinical Data, In-vitro, In-vivo)
       - abstractHighlight: string (1 sentence finding)
       - drugAndTarget: string
       - context: string (Why is this exciting?)
