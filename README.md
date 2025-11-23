@@ -1,9 +1,9 @@
 # BioInsight.AI
 
 <div align="center">
-  <div style="background: linear-gradient(to bottom right, #3b82f6, #14b8a6); width: 80px; height: 80px; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+  <div style="background: linear-gradient(to bottom right, #3b82f6, #14b8a6); width: 80px; height: 80px; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto; box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.3);">
     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
     </svg>
   </div>
   <br/>

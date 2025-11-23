@@ -23,7 +23,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'archive' | 'live'>('archive');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
-  const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
+  const [isAboutOpen, setIsAboutOpen] = useState<boolean>(true); // Changed to true for auto-open
   const [sortBy, setSortBy] = useState<'date' | 'relevance'>('date');
 
   // Filters
