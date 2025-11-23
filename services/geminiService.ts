@@ -81,13 +81,14 @@ export const fetchLiteratureAnalysis = async (
       DATA EXTRACTION RULES:
       - **Context**: Generate a short, punchy "Discovery Tag" (3-5 words) describing WHY this is interesting (e.g., "🔥 Trending on BioRxiv", "⚡ First FDA Approval", "🏆 Top 1% Impact").
       - **Abstract Highlight**: Single sentence with QUANTITATIVE results (HR, p-value, %) if available.
+      - **Title**: EXTRACT EXACT TITLE from the search result link. Do not generate a new title.
       
       OUTPUT FORMAT:
       Return a STRICT JSON array inside a \`\`\`json\`\`\` block.
       
       JSON Schema per item:
       {
-        "title": "Exact Title",
+        "title": "Exact Title from source",
         "journalOrConference": "Source Name",
         "date": "YYYY-MM-DD",
         "authors": ["Author 1", "Author 2", "et al."],
@@ -127,6 +128,7 @@ export const fetchLiteratureAnalysis = async (
     // Hydrate with IDs, verify URLs via Grounding Metadata, and refine classification
     const candidates = rawData.map((paper: any) => {
         let groundingUrl = paper.url;
+        let finalTitle = paper.title; // Default to generated title
         const chunks = discoveryResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
         
         if (chunks && chunks.length > 0) {
@@ -135,17 +137,47 @@ export const fetchLiteratureAnalysis = async (
 
             // Find best matching chunk using fuzzy logic
             const relevantChunk = chunks.find((c: any) => {
-                const chunkTitleNorm = normalize(c.web?.title);
+                const chunkTitle = c.web?.title;
+                if (!chunkTitle) return false;
+
+                const chunkTitleNorm = normalize(chunkTitle);
+                
                 return c.web?.uri && (
                     chunkTitleNorm.includes(paperTitleNorm) || 
                     paperTitleNorm.includes(chunkTitleNorm) ||
                     // Fallback: check if chunk title contains significant words from paper title
-                    (paperTitleNorm.length > 15 && chunkTitleNorm.includes(paperTitleNorm.substring(0, 20)))
+                    (paperTitleNorm.length > 15 && chunkTitleNorm.includes(paperTitleNorm.substring(0, 15)))
                 );
             });
 
             if (relevantChunk) {
                 groundingUrl = relevantChunk.web.uri;
+                
+                // CRITICAL FIX: Sync Title with Source
+                // To prevent title/link mismatches, use the actual title from the source metadata
+                if (relevantChunk.web.title) {
+                    finalTitle = relevantChunk.web.title;
+                    
+                    // Cleanup SEO suffixes to make it look like a paper title
+                    // e.g. "Study Name | Journal Name" -> "Study Name"
+                    if (finalTitle.includes(' | ')) {
+                        finalTitle = finalTitle.split(' | ')[0];
+                    }
+                    
+                    const commonSuffixes = [
+                        ' - PubMed', ' - NCBI', ' - BioRxiv', ' - MedRxiv', 
+                        ' - Nature', ' - Science', ' - ScienceDirect', 
+                        ' - Medical Xpress', ' - EurekAlert!', ' - Stat News',
+                        ' - FierceBiotech', ' - Reuters', ' - Bloomberg'
+                    ];
+
+                    for (const suffix of commonSuffixes) {
+                        if (finalTitle.endsWith(suffix)) {
+                            finalTitle = finalTitle.slice(0, -suffix.length);
+                            break;
+                        }
+                    }
+                }
             }
         }
 
@@ -161,6 +193,7 @@ export const fetchLiteratureAnalysis = async (
         return {
             ...paper,
             id: `live-${Math.random().toString(36).substring(2, 9)}`,
+            title: finalTitle.trim(),
             publicationType: finalPubType,
             authorsVerified: true, // Grounding assumes verified
             url: groundingUrl,
