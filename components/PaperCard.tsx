@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PaperData, PublicationType, StudyType, Methodology, ResearchModality } from '../types';
-import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Activity, Biohazard, Newspaper } from 'lucide-react';
+import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Activity, Biohazard, Newspaper, Radio, Sparkles } from 'lucide-react';
 
 interface PaperCardProps {
   paper: PaperData;
@@ -12,6 +12,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
   
   const isPreprint = paper.publicationType === PublicationType.Preprint;
   const isNews = paper.publicationType === PublicationType.News;
+  const isLive = paper.isLive;
   
   const getValidationColor = (score: number) => {
     if (score >= 90) return 'text-green-400 border-green-400/30 bg-green-400/10';
@@ -69,14 +70,23 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
   };
 
   return (
-    <div className="bg-slate-800 border-l-4 border-l-blue-500 border-y border-r border-slate-700 rounded-r-xl p-5 mb-4 hover:bg-slate-800/80 transition-all duration-200 shadow-lg shadow-black/20 group relative overflow-hidden">
+    <div className={`bg-slate-800 border-l-4 border-y border-r border-slate-700 rounded-r-xl p-5 mb-4 hover:bg-slate-800/80 transition-all duration-200 shadow-lg shadow-black/20 group relative overflow-hidden ${isLive ? 'border-l-blue-500 shadow-blue-900/10' : 'border-l-slate-600'}`}>
+        
+        {/* Live Badge */}
+        {isLive && (
+            <div className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg shadow-lg z-10 flex items-center gap-1">
+                <Radio className="w-3 h-3 animate-pulse" />
+                LIVE DISCOVERY
+            </div>
+        )}
+
         {/* Background decorative element */}
-        <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-blue-500/10 transition-colors"></div>
+        <div className={`absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 rounded-full blur-2xl pointer-events-none transition-colors ${isLive ? 'bg-blue-500/10 group-hover:bg-blue-500/20' : 'bg-slate-500/5 group-hover:bg-slate-500/10'}`}></div>
 
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start">
         <div className="flex-1 space-y-3 w-full">
             {/* Header Row: Type & Tags */}
-            <div className="flex flex-wrap items-center gap-2 mb-1">
+            <div className="flex flex-wrap items-center gap-2 mb-1 pr-20">
                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border flex items-center gap-1 ${getTypeStyles()}`}>
                     {isNews && <Newspaper className="w-3 h-3" />}
                     {paper.publicationType}
@@ -149,13 +159,19 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
                     <div className="text-xs text-slate-500 italic pr-2 truncate">
                         Context: {paper.context}
                     </div>
-                    <div className={`flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${paper.authorsVerified ? 'text-blue-400 border-blue-400/20 bg-blue-400/5' : 'text-amber-400 border-amber-400/20 bg-amber-400/5'}`}>
-                        {paper.authorsVerified ? (
-                             <>Verified <CheckCircle2 className="w-3 h-3" /></>
-                        ) : (
-                             <>Simulated <ShieldAlert className="w-3 h-3" /></>
-                        )}
-                    </div>
+                    {isLive ? (
+                        <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border text-blue-400 border-blue-400/20 bg-blue-400/5">
+                            AI Discovered <Sparkles className="w-3 h-3" />
+                        </div>
+                    ) : (
+                        <div className={`flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${paper.authorsVerified ? 'text-blue-400 border-blue-400/20 bg-blue-400/5' : 'text-amber-400 border-amber-400/20 bg-amber-400/5'}`}>
+                            {paper.authorsVerified ? (
+                                <>Verified <CheckCircle2 className="w-3 h-3" /></>
+                            ) : (
+                                <>Simulated <ShieldAlert className="w-3 h-3" /></>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 

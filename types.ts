@@ -64,6 +64,7 @@ export interface PaperData {
   affiliations?: string[];
   funding?: string;
   keywords?: string[];
+  isLive?: boolean;
 }
 
 export interface DashboardStats {

@@ -6,16 +6,16 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper to parse JSON from markdown code blocks or raw text
 const parseJSON = (text: string): any => {
-  // Strategy: Find the last occurrence of a JSON code block, as it usually follows the explanation
+  // Strategy: Find the last occurrence of a JSON code block
   const jsonBlockRegex = /```json\n([\s\S]*?)\n```/g;
   const matches = [...text.matchAll(jsonBlockRegex)];
   
   if (matches.length > 0) {
     try {
-      // Take the last match, as the model might output intermediate steps
+      // Take the last match
       return JSON.parse(matches[matches.length - 1][1]);
     } catch (e) {
-      console.warn("Failed to parse JSON from code block, trying raw text cleanup");
+      console.warn("Failed to parse JSON from code block");
     }
   }
 
@@ -47,82 +47,73 @@ export const fetchLiteratureAnalysis = async (
     pastDate.setDate(today.getDate() - 30);
     const dateString = pastDate.toISOString().split('T')[0];
 
-    // Dynamic Context Building
-    // If specific filters are passed, prioritize them. If empty, it means "All" or "Broad".
-    
-    const targetTopics = activeTopics.length > 0 
-        ? activeTopics.join(', ') 
-        : Object.values(DiseaseTopic).join(', ');
+    // Build targeted search context for the prompt
+    // Use 'OR' to allow discovery across selected domains, preventing over-filtering
+    const topicsList = activeTopics.length > 0 
+        ? activeTopics.join(' OR ') 
+        : "Cardiovascular Disease OR Metabolic Disease OR Kidney Disease";
 
-    const targetStudyTypes = activeStudyTypes.length > 0 
-        ? activeStudyTypes.join(', ')
-        : "Clinical Trials, Pre-clinical studies, Real-world Evidence";
+    const studyList = activeStudyTypes.length > 0 
+        ? activeStudyTypes.join(' OR ')
+        : "Clinical Trials OR New Research Breakthroughs";
 
-    // Expand "Lab Experimental" to be more descriptive for the search agent
-    const expandedMethodologies = activeMethodologies.length > 0
-        ? activeMethodologies.map(m => 
-            m === Methodology.LabExperimental 
-              ? "Lab Experimental (specifically in-vivo, in-vitro, animal models, organoids, cellular models)" 
-              : m
-          )
-        : ["AI/ML", "Statistical Analysis", "Lab Experimental (in-vivo, in-vitro, animal models, organoids)"];
+    const methodList = activeMethodologies.length > 0
+        ? activeMethodologies.join(' OR ')
+        : "AI/ML OR Statistical OR Experimental";
 
-    const targetMethodologies = expandedMethodologies.join(', ');
-
-    const allModalities = Object.values(ResearchModality).join(', ');
-    const allPubTypes = Object.values(PublicationType).join(', ');
-
-    // ---------------------------------------------------------
-    // PHASE 1: LIVE DISCOVERY WITH GROUNDING
-    // ---------------------------------------------------------
+    // Enhanced Discovery Prompt
     const discoveryPrompt = `
-      You are a scientific literature intelligence agent.
+      You are BioInsight, a real-time scientific intelligence engine acting as a "Discovery Feed" for researchers.
       
-      TASK: Search for the VERY LATEST scientific papers, preprints, and reputable news analysis published or appearing online since ${dateString} (Last 30 Days).
+      OBJECTIVE:
+      Generate a curated feed of the 6-8 most significant scientific developments from the last 30 days (Since ${dateString}).
       
-      SEARCH CRITERIA (Strictly prioritize these intersections):
-      1. DISEASE TOPICS: ${targetTopics}
-      2. STUDY DESIGNS: ${targetStudyTypes}
-      3. METHODOLOGIES: ${targetMethodologies}
-
-      SOURCES: 
-      - Major Journals: NEJM, Lancet, Nature, Cell, JAMA, Circulation, Hepatology.
-      - Preprint Servers (CRITICAL): BioRxiv, MedRxiv.
-      - Databases: PubMed, Google Scholar.
-      - Reputable Science News: StatNews, Nature News, ScienceDaily (Only if direct paper not found).
-
-      INSTRUCTIONS:
-      1. Use the Google Search tool to find at least 5-7 distinct new items.
-      2. **DETERMINISM RULE**: Use the EXACT TITLE from the search result link. Do not hallucinate or rewrite titles to sound better.
-      3. **SOURCE CLASSIFICATION**:
-         - If the link is a direct study (PubMed, DOI, Journal, BioRxiv), type is 'Peer Reviewed' or 'Preprint'.
-         - If the link is a news article (e.g., "New study shows..."), type MUST be 'News/Analysis' and the title must match the news headline.
-      4. STRATEGY: Search for the specific combination of Topic + Study Type + Methodology. 
-      5. Briefly summarize what you found in natural language (Chain of Thought).
-      6. AFTER your summary, provide a strictly formatted JSON array inside a \`\`\`json\`\`\` code block.
-
-      JSON Structure (Array of Objects):
-      - title: string (EXACT title from source)
-      - journalOrConference: string (Source Name, e.g., "Nature", "BioRxiv", or "StatNews")
-      - date: string (YYYY-MM-DD)
-      - authors: string[] (First 3 authors if available, else Organization name)
-      - topic: string (Must be one of: ${Object.values(DiseaseTopic).join(', ')})
-      - publicationType: string (Must be one of: ${allPubTypes})
-      - studyType: string (Best fit from: ${Object.values(StudyType).join(', ')})
-      - methodology: string (Best fit from: ${Object.values(Methodology).join(', ')})
-      - modality: string (Best fit from: ${allModalities})
-      - abstractHighlight: string (1 sentence finding)
-      - drugAndTarget: string (e.g. "Target: GLP-1, Drug: Semaglutide" or "N/A")
-      - context: string (Why is this specifically relevant?)
-      - validationScore: 100
-      - url: string (Web Link if available)
+      SEARCH PARAMETERS:
+      - **Focus Topics**: ${topicsList}
+      - **Study Design**: ${studyList}
+      - **Methodology**: ${methodList}
+      
+      SEARCH STRATEGY (USE GOOGLE SEARCH TOOL):
+      1.  **News & Trends**: Identify breaking news (FDA approvals, major trial results, fast-track designations) in these fields using sources like StatNews, FierceBiotech, or major medical journals.
+      2.  **Preprint Pulse**: Find trending preprints on BioRxiv/MedRxiv that use ${methodList}.
+      3.  **High-Impact**: Look for new publications in NEJM, Lancet, Nature, Circulation, Cell, Hepatology.
+      
+      DATA EXTRACTION RULES:
+      - **Titles**: MUST be the exact title from the search result.
+      - **Authors**: Extract real First/Last authors.
+      - **Affiliations**: Identify the primary institution (e.g., "Harvard Medical School").
+      - **Context**: A punchy, "Discovery-style" headline explaining why this matters (e.g., "First AI model to predict CKD progression with 90% accuracy").
+      
+      OUTPUT FORMAT:
+      Return a STRICT JSON array inside a \`\`\`json\`\`\` block. 
+      
+      JSON Schema per item:
+      {
+        "title": "Exact Title",
+        "journalOrConference": "Source Name",
+        "date": "YYYY-MM-DD",
+        "authors": ["Author 1", "Author 2", "et al."],
+        "topic": "One of: ${Object.values(DiseaseTopic).join(', ')}",
+        "publicationType": "One of: ${Object.values(PublicationType).join(', ')}",
+        "studyType": "One of: ${Object.values(StudyType).join(', ')}",
+        "methodology": "One of: ${Object.values(Methodology).join(', ')}",
+        "modality": "One of: ${Object.values(ResearchModality).join(', ')}",
+        "abstractHighlight": "Single sentence finding.",
+        "drugAndTarget": "Drug/Target or N/A",
+        "context": "Why is this a key discovery?",
+        "validationScore": 95,
+        "url": "URL if available",
+        "affiliations": ["Institution Name"],
+        "funding": "Funding source if mentioned",
+        "keywords": ["Tag1", "Tag2"]
+      }
     `;
 
     const discoveryResponse = await ai.models.generateContent({
       model: modelId,
       contents: discoveryPrompt,
       config: {
-        temperature: 0.3, // Lower temperature for more deterministic output
+        temperature: 0.2, // Low temp for factual extraction
         tools: [{ googleSearch: {} }], // Live Search Enabled
       }
     });
@@ -135,55 +126,47 @@ export const fetchLiteratureAnalysis = async (
         return [];
     }
 
-    // Hydrate with IDs and merge grounding URLs if available
+    // Hydrate with IDs, verify URLs via Grounding Metadata, and refine classification
     const candidates = rawData.map((paper: any) => {
-        // Attempt to extract grounding URL
         let groundingUrl = paper.url;
         const chunks = discoveryResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
         
         if (chunks && chunks.length > 0) {
-            // Search for a chunk that matches the paper title strongly
-            // Normalized comparison to avoid case/punctuation mismatches
             const normalize = (s: string) => s?.toLowerCase().replace(/[^a-z0-9]/g, "") || "";
             const paperTitleNorm = normalize(paper.title);
 
+            // Find best matching chunk using fuzzy logic
             const relevantChunk = chunks.find((c: any) => {
                 const chunkTitleNorm = normalize(c.web?.title);
                 return c.web?.uri && (
                     chunkTitleNorm.includes(paperTitleNorm) || 
-                    paperTitleNorm.includes(chunkTitleNorm)
+                    paperTitleNorm.includes(chunkTitleNorm) ||
+                    // Fallback: check if chunk title contains significant words from paper title
+                    (paperTitleNorm.length > 15 && chunkTitleNorm.includes(paperTitleNorm.substring(0, 20)))
                 );
             });
 
             if (relevantChunk) {
                 groundingUrl = relevantChunk.web.uri;
-                // OPTIONAL: Enforce title consistency if the AI title seems very different
-                // But usually, we trust the AI's extraction if the prompt is strict.
-            } else if (!paper.url && chunks.length > 0) {
-                // Fallback: If no URL is set, and we can't match titles perfect, 
-                // but the AI returned items in order, we might sometimes want to guess, 
-                // but strictly it's better to have no link than a wrong one.
-                // However, often the first chunk corresponds to the first finding.
-                // Let's leave it empty if no match to be deterministic/safe.
             }
         }
 
-        // Final Safety Check for News vs Paper
+        // Auto-classify news sites
         let finalPubType = paper.publicationType;
         if (groundingUrl) {
-            const newsDomains = ['nytimes.com', 'statnews.com', 'medicalxpress.com', 'sciencedaily.com', 'forbes.com', 'bloomberg.com'];
-            const isNewsDomain = newsDomains.some(d => groundingUrl.includes(d));
-            if (isNewsDomain) {
+            const newsDomains = ['statnews.com', 'fiercebiotech.com', 'medscape.com', 'sciencedaily.com', 'eurekalert.org', 'medicalxpress.com', 'forbes.com', 'bloomberg.com', 'nytimes.com'];
+            if (newsDomains.some(d => groundingUrl.includes(d))) {
                 finalPubType = PublicationType.News;
             }
         }
 
         return {
             ...paper,
-            id: Math.random().toString(36).substring(2, 15),
+            id: `live-${Math.random().toString(36).substring(2, 9)}`,
             publicationType: finalPubType,
             authorsVerified: true, // Grounding assumes verified
-            url: groundingUrl
+            url: groundingUrl,
+            isLive: true
         };
     });
 
