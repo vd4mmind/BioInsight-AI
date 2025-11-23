@@ -48,44 +48,42 @@ export const fetchLiteratureAnalysis = async (
     const dateString = pastDate.toISOString().split('T')[0];
 
     // Build targeted search context for the prompt
-    // Use 'OR' to allow discovery across selected domains, preventing over-filtering
+    // Use comma-separated lists for clearer context instructions
     const topicsList = activeTopics.length > 0 
-        ? activeTopics.join(' OR ') 
-        : "Cardiovascular Disease OR Metabolic Disease OR Kidney Disease";
+        ? activeTopics.join(', ') 
+        : "Cardiovascular, Kidney, Metabolic, Liver Diseases (NASH/MASH), Diabetes, Obesity";
 
     const studyList = activeStudyTypes.length > 0 
-        ? activeStudyTypes.join(' OR ')
-        : "Clinical Trials OR New Research Breakthroughs";
+        ? activeStudyTypes.join(', ')
+        : "Clinical Trials, Novel Research Mechanisms, Real-world Evidence";
 
     const methodList = activeMethodologies.length > 0
-        ? activeMethodologies.join(' OR ')
-        : "AI/ML OR Statistical OR Experimental";
+        ? activeMethodologies.join(', ')
+        : "AI/ML, Deep Learning, Omics, Statistical Analysis";
 
     // Enhanced Discovery Prompt
     const discoveryPrompt = `
-      You are BioInsight, a real-time scientific intelligence engine acting as a "Discovery Feed" for researchers.
+      You are BioInsight, a "Discovery Engine" for biomedical researchers.
       
-      OBJECTIVE:
-      Generate a curated feed of the 6-8 most significant scientific developments from the last 30 days (Since ${dateString}).
+      TASK:
+      Scan the web (last 30 days, since ${dateString}) for the top 6-8 high-impact scientific developments matching this profile:
       
-      SEARCH PARAMETERS:
-      - **Focus Topics**: ${topicsList}
-      - **Study Design**: ${studyList}
-      - **Methodology**: ${methodList}
-      
-      SEARCH STRATEGY (USE GOOGLE SEARCH TOOL):
-      1.  **News & Trends**: Identify breaking news (FDA approvals, major trial results, fast-track designations) in these fields using sources like StatNews, FierceBiotech, or major medical journals.
-      2.  **Preprint Pulse**: Find trending preprints on BioRxiv/MedRxiv that use ${methodList}.
-      3.  **High-Impact**: Look for new publications in NEJM, Lancet, Nature, Circulation, Cell, Hepatology.
-      
+      USER FILTERS (STRICT):
+      - TOPICS: [${topicsList}]
+      - METHODOLOGY: [${methodList}]
+      - STUDY TYPES: [${studyList}]
+
+      SEARCH STRATEGY (What counts as "Discovery"?):
+      1. **Trending Preprints**: Papers on BioRxiv/MedRxiv gaining social traction (Twitter/X buzz).
+      2. **Major Milestones**: FDA approvals, Phase 3 readouts, or "First-in-class" announcements.
+      3. **Tech Shifts**: AI models (e.g. AlphaFold derivatives) applied to these specific diseases.
+
       DATA EXTRACTION RULES:
-      - **Titles**: MUST be the exact title from the search result.
-      - **Authors**: Extract real First/Last authors.
-      - **Affiliations**: Identify the primary institution (e.g., "Harvard Medical School").
-      - **Context**: A punchy, "Discovery-style" headline explaining why this matters (e.g., "First AI model to predict CKD progression with 90% accuracy").
+      - **Context**: Generate a short, punchy "Discovery Tag" (3-5 words) describing WHY this is interesting (e.g., "🔥 Trending on BioRxiv", "⚡ First FDA Approval", "🏆 Top 1% Impact").
+      - **Abstract Highlight**: Single sentence with QUANTITATIVE results (HR, p-value, %) if available.
       
       OUTPUT FORMAT:
-      Return a STRICT JSON array inside a \`\`\`json\`\`\` block. 
+      Return a STRICT JSON array inside a \`\`\`json\`\`\` block.
       
       JSON Schema per item:
       {
@@ -93,16 +91,16 @@ export const fetchLiteratureAnalysis = async (
         "journalOrConference": "Source Name",
         "date": "YYYY-MM-DD",
         "authors": ["Author 1", "Author 2", "et al."],
-        "topic": "One of: ${Object.values(DiseaseTopic).join(', ')}",
-        "publicationType": "One of: ${Object.values(PublicationType).join(', ')}",
-        "studyType": "One of: ${Object.values(StudyType).join(', ')}",
-        "methodology": "One of: ${Object.values(Methodology).join(', ')}",
-        "modality": "One of: ${Object.values(ResearchModality).join(', ')}",
-        "abstractHighlight": "Single sentence finding.",
+        "topic": "Best match from: ${Object.values(DiseaseTopic).join(', ')}",
+        "publicationType": "Best match from: ${Object.values(PublicationType).join(', ')}",
+        "studyType": "Best match from: ${Object.values(StudyType).join(', ')}",
+        "methodology": "Best match from: ${Object.values(Methodology).join(', ')}",
+        "modality": "Best match from: ${Object.values(ResearchModality).join(', ')}",
+        "abstractHighlight": "Key finding with numbers.",
         "drugAndTarget": "Drug/Target or N/A",
-        "context": "Why is this a key discovery?",
+        "context": "The Discovery Tag (e.g. '🔥 Trending on BioRxiv')",
         "validationScore": 95,
-        "url": "URL if available",
+        "url": "Source URL",
         "affiliations": ["Institution Name"],
         "funding": "Funding source if mentioned",
         "keywords": ["Tag1", "Tag2"]

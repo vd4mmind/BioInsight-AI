@@ -1,20 +1,74 @@
+# BioInsight.AI
+
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <div style="background: linear-gradient(to bottom right, #3b82f6, #14b8a6); width: 80px; height: 80px; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+    </svg>
+  </div>
+  <br/>
+  <h1>BioInsight.AI</h1>
+  <h3>Live Scientific Intelligence Feed</h3>
 </div>
 
-# Run and deploy your AI Studio app
+## 🚀 Overview
 
-This contains everything you need to run your app locally.
+**BioInsight.AI** is a next-generation scientific intelligence platform designed to bridge the gap between static archives and real-time discovery. It serves as a "Discovery Engine" for biomedical researchers, tracking breakthrough developments in **Cardiovascular Disease, CKD, Metabolic Disorders, and AI-driven Biology**.
 
-View your app in AI Studio: https://ai.studio/apps/drive/14yPe7JuBS9rrVFBXIYcterUPEnjfSsSd
+The app features a dual-mode system:
+1.  **Archive Mode**: A curated, validated database of landmark papers (2010–Present).
+2.  **Live Intelligence Feed**: A real-time discovery feed powered by **Google Gemini 2.5 Flash** and **Google Search Grounding**, which scans the web (PubMed, BioRxiv, News) for high-impact research from the last 30 days.
 
-## Run Locally
+## 🛠️ Tech Stack
 
-**Prerequisites:**  Node.js
+*   **Frontend**: React 19, TypeScript, Vite
+*   **Styling**: Tailwind CSS, Lucide React (Icons)
+*   **Data Visualization**: Recharts
+*   **AI Core**: 
+    *   **Google Gemini 2.5 Flash**: Advanced reasoning for extracting structured clinical data from unstructured web results.
+    *   **Google Search Grounding**: Real-time verification and data sourcing.
 
+## ✨ Key Features
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+*   **Discovery Feed**: A "Google Discover"-style feed for scientists, highlighting trending preprints, FDA approvals, and controversial studies.
+*   **Intersection Filtering**: Find papers specifically at the intersection of *Topic* (e.g., NASH) + *Methodology* (e.g., AI/ML).
+*   **Smart Context Tags**: Auto-generated tags like "🔥 Trending on BioRxiv" or "⚡ First in Class" to explain *why* a paper matters.
+*   **Visual Analytics**: Real-time charts showing the distribution of topics in the current feed.
+
+## 👨‍💻 Developer
+
+**Vivek Das**  
+*Senior Frontend Engineer & AI Specialist*
+
+Passionate about building AI-augmented tools for scientific discovery and healthcare.
+
+## ⚠️ Disclaimer
+
+**Research Use Only.** BioInsight.AI aggregates and analyzes public scientific data using Generative AI. While we use search grounding to verify sources, all findings should be independently verified against the original publication. This tool is not for clinical decision-making.
+
+## 🏃‍♂️ How to Run Locally
+
+1.  **Clone the repository**
+    ```bash
+    git clone https://github.com/yourusername/bioinsight-ai.git
+    cd bioinsight-ai
+    ```
+
+2.  **Install Dependencies**
+    ```bash
+    npm install
+    ```
+
+3.  **Set up Environment Variables**
+    Create a `.env` file in the root directory and add your Google Gemini API Key:
+    ```bash
+    API_KEY=your_google_gemini_api_key_here
+    ```
+
+4.  **Start the Application**
+    ```bash
+    npm start
+    ```
+
+---
+*Built with ❤️ using Google Gemini API*

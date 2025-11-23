@@ -74,7 +74,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
         
         {/* Live Badge */}
         {isLive && (
-            <div className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg shadow-lg z-10 flex items-center gap-1">
+            <div className="absolute top-0 right-0 bg-gradient-to-l from-blue-600 to-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg shadow-lg z-10 flex items-center gap-1.5">
                 <Radio className="w-3 h-3 animate-pulse" />
                 LIVE DISCOVERY
             </div>
@@ -98,6 +98,18 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
                     {paper.studyType}
                 </span>
             </div>
+
+            {/* Live Discovery Context (Headline) */}
+            {isLive && paper.context && (
+                <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.15)]">
+                         <Sparkles className="w-3 h-3 text-blue-400 animate-pulse" />
+                         <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider">
+                            {paper.context}
+                         </span>
+                    </div>
+                </div>
+            )}
 
             {/* Title - CLICKABLE LINK */}
             {paper.url ? (
@@ -156,9 +168,17 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
                 </div>
                 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-                    <div className="text-xs text-slate-500 italic pr-2 truncate">
-                        Context: {paper.context}
-                    </div>
+                    {/* For live papers, we showed context at the top. For archive, we show here. */}
+                    {!isLive ? (
+                        <div className="text-xs text-slate-500 italic pr-2 truncate">
+                            Context: {paper.context}
+                        </div>
+                    ) : (
+                         <div className="text-xs text-slate-500 italic pr-2">
+                            {/* Empty or auxiliary info for live items */}
+                        </div>
+                    )}
+
                     {isLive ? (
                         <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border text-blue-400 border-blue-400/20 bg-blue-400/5">
                             AI Discovered <Sparkles className="w-3 h-3" />
