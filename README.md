@@ -38,7 +38,6 @@ The app features a dual-mode system:
 ## 👨‍💻 Developer
 
 **Vivek Das**  
-*Senior Frontend Engineer & AI Specialist*
 
 Passionate about building AI-augmented tools for scientific discovery and healthcare.
 
