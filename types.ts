@@ -11,7 +11,9 @@ export enum DiseaseTopic {
 export enum PublicationType {
   Preprint = 'Preprint',
   PeerReviewed = 'Peer Reviewed',
-  News = 'News/Analysis'
+  News = 'News/Analysis',
+  ConferenceAbstract = 'Conference Abstract',
+  Poster = 'Poster'
 }
 
 export enum StudyType {
@@ -65,6 +67,7 @@ export interface PaperData {
   funding?: string;
   keywords?: string[];
   isLive?: boolean;
+  isSearchFallback?: boolean; // New flag for UI handling of fallback links
 }
 
 export interface DashboardStats {

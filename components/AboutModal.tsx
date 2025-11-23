@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Cpu, Globe, Zap, Info, Search, BrainCircuit } from 'lucide-react';
+import { X, Cpu, Globe, Zap, Info, Search, BrainCircuit, ShieldCheck, Link2 } from 'lucide-react';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -58,14 +58,14 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     <BrainCircuit className="w-3 h-3 text-teal-400" />
                     <div className="text-teal-400 text-xs font-bold">Google Gemini 2.5 Flash</div>
                 </div>
-                <p className="text-slate-500 text-xs">High-speed reasoning engine for analyzing complex medical abstracts.</p>
+                <p className="text-slate-500 text-xs">High-speed reasoning engine for extracting structured clinical data from unstructured web results.</p>
               </div>
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                 <div className="flex items-center gap-2 mb-1">
                     <Search className="w-3 h-3 text-indigo-400" />
-                    <div className="text-indigo-400 text-xs font-bold">Search Grounding</div>
+                    <div className="text-indigo-400 text-xs font-bold">Strict Search Grounding</div>
                 </div>
-                <p className="text-slate-500 text-xs">Real-time connection to Google Search to fetch papers from the last 30 days.</p>
+                <p className="text-slate-500 text-xs">Real-time connection to Google Search with URL verification to prevent hallucinations.</p>
               </div>
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                 <div className="flex items-center gap-2 mb-1">
@@ -73,6 +73,13 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     <div className="text-blue-400 text-xs font-bold">React 19 & Tailwind</div>
                 </div>
                 <p className="text-slate-500 text-xs">Modern, responsive UI with concurrent rendering features.</p>
+              </div>
+              <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                <div className="flex items-center gap-2 mb-1">
+                    <ShieldCheck className="w-3 h-3 text-green-400" />
+                    <div className="text-green-400 text-xs font-bold">Anti-Hallucination Logic</div>
+                </div>
+                <p className="text-slate-500 text-xs">Automated link checking with fallback to Search Query if a direct URL is unverified.</p>
               </div>
             </div>
           </section>
@@ -87,13 +94,17 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                 <span className="text-slate-300 font-bold">Context-Aware Querying:</span> The system analyzes your <span className="text-blue-400">currently selected filters</span> (Disease Topics, Methodologies) to construct a targeted search query, ensuring results are relevant to your specific research interests.
               </li>
               <li>
-                <span className="text-slate-300 font-bold">Google Search Grounding:</span> Gemini executes a live search against Google's index, prioritizing major journals and preprint servers (BioRxiv/MedRxiv) to find content published in the <span className="text-blue-400">last 30 days</span>.
+                <span className="text-slate-300 font-bold">Expanded Discovery:</span> Gemini executes a live search against Google's index, prioritizing major journals, <span className="text-blue-400">Preprint Servers</span>, <span className="text-blue-400">Conference Posters</span>, and <span className="text-blue-400">Meeting Abstracts</span> from the last 30 days.
               </li>
               <li>
                 <span className="text-slate-300 font-bold">AI Synthesis & Parsing:</span> The model processes raw search results into structured clinical data, extracting authors, affiliations, and generating one-sentence abstract highlights.
               </li>
               <li>
-                <span className="text-slate-300 font-bold">Verification:</span> Incoming results are compared against existing entries to remove duplicates before being rendered in the feed.
+                <span className="text-slate-300 font-bold">Smart Link Verification:</span> Incoming titles are cross-referenced with Google Search metadata. 
+                <ul className="pl-5 mt-1 space-y-1 list-disc text-slate-500">
+                   <li>If a direct URL is verified, it is displayed as <span className="text-blue-400">"Read Source"</span>.</li>
+                   <li>If the specific URL is ambiguous, the system provides a <span className="text-slate-300">"Find Source"</span> fallback link to prevent broken URLs.</li>
+                </ul>
               </li>
             </ol>
           </section>

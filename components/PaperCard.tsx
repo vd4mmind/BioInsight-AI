@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PaperData, PublicationType, StudyType, Methodology, ResearchModality } from '../types';
-import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Activity, Biohazard, Newspaper, Radio, Sparkles } from 'lucide-react';
+import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Activity, Biohazard, Newspaper, Radio, Sparkles, Search } from 'lucide-react';
 
 interface PaperCardProps {
   paper: PaperData;
@@ -282,9 +282,13 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
                             href={paper.url} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 underline decoration-blue-400/30 hover:decoration-blue-300"
+                            className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${paper.isSearchFallback ? 'text-slate-300 bg-slate-700/50 hover:bg-slate-700' : 'text-blue-400 hover:text-blue-300 underline decoration-blue-400/30 hover:decoration-blue-300'}`}
                         >
-                            {isNews ? 'Read Article' : 'Read Source'} <ExternalLink className="w-3 h-3" />
+                            {paper.isSearchFallback ? (
+                                <>Find Source <Search className="w-3 h-3" /></>
+                            ) : (
+                                <>{isNews ? 'Read Article' : 'Read Source'} <ExternalLink className="w-3 h-3" /></>
+                            )}
                         </a>
                     </div>
                 )}

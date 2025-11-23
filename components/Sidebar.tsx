@@ -1,6 +1,6 @@
 import React from 'react';
 import { DiseaseTopic, StudyType, Methodology } from '../types';
-import { Filter, ChevronDown, CalendarRange, FlaskConical, Microscope, Clock, Check } from 'lucide-react';
+import { Filter, ChevronDown, CalendarRange, FlaskConical, Microscope, Clock, Check, Radio } from 'lucide-react';
 
 interface SidebarProps {
   activeTopics: DiseaseTopic[];
@@ -11,6 +11,7 @@ interface SidebarProps {
   toggleMethodology: (methodology: Methodology) => void;
   eraFilter: 'all' | '5years' | '1year';
   setEraFilter: (era: 'all' | '5years' | '1year') => void;
+  isLiveMode: boolean; // NEW PROP
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
@@ -21,16 +22,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeMethodologies,
   toggleMethodology,
   eraFilter,
-  setEraFilter
+  setEraFilter,
+  isLiveMode
 }) => {
   return (
     <aside className="w-full lg:w-64 shrink-0 space-y-6 mb-6 lg:mb-0">
       
-      {/* Era Filter - Simplified for Tracker */}
-      <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+      {/* Era Filter - VISUALLY DISABLED IN LIVE MODE */}
+      <div className={`bg-slate-800 border border-slate-700 rounded-xl p-4 transition-opacity duration-300 ${isLiveMode ? 'opacity-50 pointer-events-none grayscale' : 'opacity-100'}`}>
          <div className="flex items-center gap-2 mb-3 text-slate-300 font-semibold">
           <Clock className="w-4 h-4" />
           <span>Timeline</span>
+          {isLiveMode && <span className="text-[10px] bg-slate-700 px-2 py-0.5 rounded text-slate-300 ml-auto">Fixed: Last 30d</span>}
         </div>
         
         <div className="space-y-1">
@@ -59,9 +62,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Topics Panel */}
-      <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+      <div className={`bg-slate-800 border border-slate-700 rounded-xl p-4 ${isLiveMode ? 'border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : ''}`}>
         <div className="flex items-center gap-2 mb-4 text-slate-300 font-semibold">
-          <Filter className="w-4 h-4" />
+          {isLiveMode ? <Radio className="w-4 h-4 text-blue-400 animate-pulse" /> : <Filter className="w-4 h-4" />}
           <span>Disease Topics</span>
         </div>
         <div className="space-y-2">

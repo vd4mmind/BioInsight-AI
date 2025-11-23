@@ -9,7 +9,7 @@ import { PaperData, DiseaseTopic, StudyType, Methodology, PublicationType } from
 import { INITIAL_PAPERS, APP_NAME, APP_VERSION } from './constants';
 import { fetchLiteratureAnalysis } from './services/geminiService';
 import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Cell } from 'recharts';
-import { RefreshCw, BookOpen, Activity, FlaskConical, Database, History, Radio, Sparkles, FileText } from 'lucide-react';
+import { RefreshCw, BookOpen, Activity, FlaskConical, Database, History, Radio, Sparkles, FileText, ArrowDownUp, FilterX } from 'lucide-react';
 
 const App: React.FC = () => {
   // --- STATE ---
@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
+  const [sortBy, setSortBy] = useState<'date' | 'relevance'>('date');
 
   // Filters
   const [activeTopics, setActiveTopics] = useState<DiseaseTopic[]>(Object.values(DiseaseTopic));
@@ -36,11 +37,18 @@ const App: React.FC = () => {
 
   const filteredPapers = useMemo(() => {
     const filtered = currentPapers.filter(paper => {
+      // 1. Topic Match
       const topicMatch = activeTopics.includes(paper.topic);
+      
+      // 2. Study Type Match
       const studyTypeMatch = activeStudyTypes.includes(paper.studyType);
+      
+      // 3. Methodology Match
       const methodologyMatch = activeMethodologies.includes(paper.methodology);
       
-      // Date/Era Logic (Only applies to Archive, Live is always "Now")
+      // 4. Date/Era Logic
+      // CRITICAL UPDATE: If activeTab is 'live', we IGNORE the eraFilter.
+      // Live papers are always "current".
       let dateMatch = true;
       if (activeTab === 'archive') {
           const paperYear = new Date(paper.date).getFullYear();
@@ -52,9 +60,16 @@ const App: React.FC = () => {
       return topicMatch && studyTypeMatch && methodologyMatch && dateMatch;
     });
 
-    // Sort: Newest First
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [currentPapers, activeTopics, activeStudyTypes, activeMethodologies, eraFilter, activeTab]);
+    // Sort Logic
+    return filtered.sort((a, b) => {
+        if (sortBy === 'date') {
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+        } else {
+            // Sort by Score, then Date
+            return (b.validationScore - a.validationScore) || (new Date(b.date).getTime() - new Date(a.date).getTime());
+        }
+    });
+  }, [currentPapers, activeTopics, activeStudyTypes, activeMethodologies, eraFilter, activeTab, sortBy]);
 
   // --- STATS LOGIC ---
   const stats = useMemo(() => {
@@ -87,17 +102,16 @@ const App: React.FC = () => {
     // Simulate "Checking sources..." delay for UX
     await new Promise(r => setTimeout(r, 800));
 
-    // Pass active filters to the API to ensure relevant discovery
-    // If all options are selected (or none), we pass empty array for "Broad Search"
+    // INTELLIGENCE TRACKER LOGIC:
+    // If specific filters are selected, we pass them to the API.
+    // If ALL are selected, we pass the full list (which the API interprets as broad or specific depending on implementation)
+    // Actually, simpler: just pass the active arrays. The Service logic handles the "if all are selected" optimization if needed,
+    // but for an "Intelligence Tracker", specific inputs = specific search.
     
-    const isAllTopicsSelected = activeTopics.length === Object.values(DiseaseTopic).length;
-    const searchTopics = isAllTopicsSelected ? [] : activeTopics;
-
-    const isAllStudyTypesSelected = activeStudyTypes.length === Object.values(StudyType).length;
-    const searchStudyTypes = isAllStudyTypesSelected ? [] : activeStudyTypes;
-
-    const isAllMethodologiesSelected = activeMethodologies.length === Object.values(Methodology).length;
-    const searchMethodologies = isAllMethodologiesSelected ? [] : activeMethodologies;
+    // We pass the current state of the checkboxes directly.
+    const searchTopics = activeTopics;
+    const searchStudyTypes = activeStudyTypes;
+    const searchMethodologies = activeMethodologies;
 
     const newPapers = await fetchLiteratureAnalysis([], searchTopics, searchStudyTypes, searchMethodologies);
     
@@ -120,6 +134,12 @@ const App: React.FC = () => {
   };
   const toggleMethodology = (methodology: Methodology) => {
     setActiveMethodologies(prev => prev.includes(methodology) ? prev.filter(m => m !== methodology) : [...prev, methodology]);
+  };
+
+  const handleResetFilters = () => {
+    setActiveTopics(Object.values(DiseaseTopic));
+    setActiveStudyTypes(Object.values(StudyType));
+    setActiveMethodologies(Object.values(Methodology));
   };
 
   return (
@@ -176,13 +196,14 @@ const App: React.FC = () => {
             toggleMethodology={toggleMethodology}
             eraFilter={eraFilter}
             setEraFilter={setEraFilter}
+            isLiveMode={activeTab === 'live'}
           />
 
           {/* Main Feed Area */}
           <div className="flex-1 min-w-0">
              
              {/* Feed Tabs & Header */}
-             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
                 
                 {/* Custom Tabs */}
                 <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700">
@@ -191,69 +212,116 @@ const App: React.FC = () => {
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'archive' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
                     >
                         <History className="w-4 h-4" />
-                        Key Papers (Since 2010)
+                        Archive
                     </button>
                     <button 
                         onClick={() => setActiveTab('live')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'live' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-slate-200'}`}
                     >
                         {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Radio className="w-4 h-4" />}
-                        Live Intelligence Feed
+                        Live Feed
                     </button>
                 </div>
 
-                {/* Refresh Button (Context Aware) */}
-                <button 
-                    onClick={handleLiveRefresh}
-                    disabled={isLoading}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 hover:border-blue-500 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-all"
-                >
-                    <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
-                    {activeTab === 'live' ? 'Fetch Latest Papers' : 'Switch to Live Search'}
-                </button>
-             </div>
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                    {/* Sort Dropdown */}
+                    <div className="relative flex items-center bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 gap-2">
+                        <ArrowDownUp className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-xs text-slate-400 font-medium mr-1">Sort:</span>
+                        <select 
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value as 'date' | 'relevance')}
+                            className="bg-transparent text-xs font-bold text-slate-200 focus:outline-none cursor-pointer appearance-none pr-4"
+                            style={{ backgroundImage: 'none' }}
+                        >
+                            <option value="date">Latest Date</option>
+                            <option value="relevance">Impact Score</option>
+                        </select>
+                    </div>
 
-             {/* Chart Area */}
-             <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-6">
-                <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">
-                    {activeTab === 'archive' ? 'Historical Topic Distribution' : 'Live Trend Distribution'}
-                </h3>
-                <div className="h-32 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={topicData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                            <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                            <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                            <Tooltip 
-                                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
-                                itemStyle={{ color: '#fff' }}
-                                cursor={{fill: 'transparent'}}
-                            />
-                            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                {topicData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
+                    {/* Refresh Button */}
+                    <button 
+                        onClick={handleLiveRefresh}
+                        disabled={isLoading}
+                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 hover:border-blue-500 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-all"
+                    >
+                        <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+                        {activeTab === 'live' ? 'Fetch Latest' : 'Switch to Live'}
+                    </button>
                 </div>
              </div>
 
+             {/* Chart Area - Only show if we have data */}
+             {filteredPapers.length > 0 && (
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-6">
+                    <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">
+                        {activeTab === 'archive' ? 'Historical Topic Distribution' : 'Live Trend Distribution'}
+                    </h3>
+                    <div className="h-32 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={topicData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                                <Tooltip 
+                                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
+                                    itemStyle={{ color: '#fff' }}
+                                    cursor={{fill: 'transparent'}}
+                                />
+                                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                    {topicData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+             )}
+
              {/* Papers List */}
              <div className="space-y-1">
+                {/* Initial Live State */}
                 {activeTab === 'live' && livePapers.length === 0 && !isLoading && (
                     <div className="text-center py-12 border-2 border-dashed border-slate-700 rounded-xl bg-slate-800/30">
                         <Radio className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                        <p className="text-slate-300 font-medium">Ready to scan live sources.</p>
-                        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                            Click "Fetch Latest Papers" to trigger the AI agent to search Google, PubMed, and BioRxiv for papers published in the last 30 days based on your current filters.
+                        <h3 className="text-lg font-bold text-slate-200">Live Intelligence Standby</h3>
+                        <p className="text-slate-400 mt-2 max-w-sm mx-auto mb-4">
+                            System is ready to scan for recent papers, posters, and abstracts based on your selected filters.
                         </p>
+                        <button 
+                            onClick={handleLiveRefresh}
+                            className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors"
+                        >
+                            <Sparkles className="w-4 h-4" /> Start Discovery Scan
+                        </button>
                     </div>
                 )}
                 
-                {filteredPapers.length === 0 && activeTab === 'archive' ? (
-                     <div className="text-center py-20">
-                        <p className="text-slate-400">No papers match the current era filter.</p>
+                {/* Empty Filter State (Loaded but filtered to 0) */}
+                {filteredPapers.length === 0 && (activeTab === 'archive' || (activeTab === 'live' && livePapers.length > 0)) ? (
+                     <div className="text-center py-12 border border-slate-700 rounded-xl bg-slate-800/50">
+                        <FilterX className="w-10 h-10 text-slate-500 mx-auto mb-3" />
+                        <h4 className="text-slate-300 font-bold">No Results Found</h4>
+                        <p className="text-xs text-slate-500 mt-1 mb-4">
+                           Your current filters are too strict. The feed is empty.
+                        </p>
+                        
+                        <div className="bg-slate-900/50 inline-block p-4 rounded-lg border border-slate-700 text-left space-y-2 max-w-md">
+                            <p className="text-xs font-bold text-slate-400 uppercase">How to improve search:</p>
+                            <ul className="text-xs text-slate-400 list-disc list-inside space-y-1">
+                                {activeTopics.length < 3 && <li>Select more <strong>Disease Topics</strong> in the sidebar.</li>}
+                                {activeMethodologies.length < 3 && <li>Broaden <strong>Methodology</strong> (try enabling AI/ML).</li>}
+                                {activeStudyTypes.length < 2 && <li>Include <strong>Pre-clinical</strong> or <strong>Simulated</strong> studies.</li>}
+                                {activeTab === 'archive' && <li>Switch <strong>Timeline</strong> to "Since 2010" (Archive only).</li>}
+                            </ul>
+                            <button 
+                                onClick={handleResetFilters}
+                                className="mt-3 w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 rounded text-xs font-semibold transition-colors"
+                            >
+                                Reset All Filters
+                            </button>
+                        </div>
                      </div>
                 ) : (
                     filteredPapers.map(paper => (
