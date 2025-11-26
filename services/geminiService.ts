@@ -48,8 +48,6 @@ export const fetchLiteratureAnalysis = async (
     const dateString = pastDate.toISOString().split('T')[0];
 
     // --- INTELLIGENCE TRACKER QUERY BUILDER ---
-    const hasSpecificTopics = activeTopics.length > 0 && activeTopics.length < Object.keys(DiseaseTopic).length;
-    const hasSpecificMethods = activeMethodologies.length > 0 && activeMethodologies.length < Object.keys(Methodology).length;
     
     // 2. Intelligence Tracker Prompt
     const discoveryPrompt = `
@@ -128,62 +126,88 @@ export const fetchLiteratureAnalysis = async (
         const chunks = discoveryResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
         
         // --- STRICT GROUNDING SYNC LOGIC ---
-        // 1. Attempt to find a direct verified match in Search Chunks
+        // 1. Attempt to find a direct verified match in Search Chunks with SCORING
         if (chunks && chunks.length > 0) {
-            const normalize = (s: string) => s?.toLowerCase().replace(/[^a-z0-9]/g, "") || "";
+            const normalize = (s: string) => s?.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim() || "";
             const paperTitleNorm = normalize(paper.title);
+            
+            // Find best matching chunk using a scoring system to prioritize metadata
+            const matchedChunk = chunks
+                .map((c: any) => {
+                    const chunkTitle = c.web?.title;
+                    if (!chunkTitle || !c.web?.uri) return { chunk: null, score: 0 };
+                    
+                    const chunkTitleNorm = normalize(chunkTitle);
+                    let score = 0;
 
-            const relevantChunk = chunks.find((c: any) => {
-                const chunkTitle = c.web?.title;
-                if (!chunkTitle) return false;
-                const chunkTitleNorm = normalize(chunkTitle);
-                
-                // Bidirectional inclusion check for robustness
-                return c.web?.uri && (
-                    chunkTitleNorm.includes(paperTitleNorm) || 
-                    paperTitleNorm.includes(chunkTitleNorm) ||
-                    (paperTitleNorm.length > 15 && chunkTitleNorm.includes(paperTitleNorm.substring(0, 15)))
-                );
-            });
+                    // A. Exact or Inclusion Match (High Confidence)
+                    if (chunkTitleNorm.includes(paperTitleNorm) || paperTitleNorm.includes(chunkTitleNorm)) {
+                        score += 100;
+                    } 
+                    // B. Keyword Overlap (Medium Confidence)
+                    else {
+                         const paperWords = paperTitleNorm.split(/\s+/).filter(w => w.length > 3);
+                         const chunkWords = chunkTitleNorm.split(/\s+/);
+                         if (paperWords.length > 0) {
+                             const matches = paperWords.filter(w => chunkWords.includes(w)).length;
+                             const ratio = matches / paperWords.length;
+                             if (ratio > 0.5) score += (ratio * 80); // Up to 80 points
+                         }
+                    }
+                    return { chunk: c, score };
+                })
+                .sort((a, b) => b.score - a.score) // Sort by score descending
+                .find(item => item.score > 40); // Minimum threshold
 
-            if (relevantChunk) {
-                groundingUrl = relevantChunk.web.uri;
+            if (matchedChunk && matchedChunk.chunk) {
+                const c = matchedChunk.chunk;
+                groundingUrl = c.web.uri;
                 
-                // Use the Source Title to ensure link accuracy
-                if (relevantChunk.web.title) {
-                    finalTitle = relevantChunk.web.title;
+                // Use the verified Source Title if it's substantial
+                if (c.web.title && c.web.title.length > 10) {
+                    finalTitle = c.web.title;
                     
                     // CLEANUP: Remove common SEO suffixes
                     const commonSuffixes = [
                         ' - PubMed', ' - NCBI', ' - BioRxiv', ' - MedRxiv', 
                         ' - Nature', ' - Science', ' - ScienceDirect', 
                         ' - Medical Xpress', ' - EurekAlert!', ' - Stat News',
-                        ' | NEJM', ' | The Lancet'
+                        ' | NEJM', ' | The Lancet', ' | New England Journal of Medicine',
+                        ' | JAMA', ' | AHA Journals'
                     ];
 
+                    // Remove "Title | Journal" suffixes
                     if (finalTitle.includes(' | ')) {
                         const parts = finalTitle.split(' | ');
-                        if (parts[parts.length-1].length < 20) {
+                        if (parts.length > 1 && parts[parts.length-1].length < 30) {
                              parts.pop();
                              finalTitle = parts.join(' | ');
                         }
                     }
 
+                    // Remove " - Source" suffixes case-insensitively
                     for (const suffix of commonSuffixes) {
-                        if (finalTitle.endsWith(suffix)) {
-                            finalTitle = finalTitle.slice(0, -suffix.length);
-                            break;
-                        }
+                        const regex = new RegExp(suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
+                        finalTitle = finalTitle.replace(regex, '');
                     }
                 }
             }
         }
 
         // 2. FALLBACK SAFETY NET (No Broken Links)
-        // If we still don't have a URL, do NOT use the AI hallucinated URL.
-        // Instead, construct a Google Search Query URL.
+        // If no verified URL found from chunks, construct a smart Google Search URL.
         if (!groundingUrl) {
-             const searchQuery = `${paper.title} ${paper.authors?.[0] || ""} ${paper.journalOrConference || ""}`;
+             const queryParts = [paper.title];
+             // Add first author if available (skip generic 'et al')
+             if (paper.authors?.[0] && !paper.authors[0].toLowerCase().includes('et al')) {
+                 queryParts.push(paper.authors[0]);
+             }
+             // Add journal if available
+             if (paper.journalOrConference) {
+                 queryParts.push(paper.journalOrConference);
+             }
+             
+             const searchQuery = queryParts.join(' ');
              groundingUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
              isSearchFallback = true;
         }
@@ -192,7 +216,9 @@ export const fetchLiteratureAnalysis = async (
         let finalPubType = paper.publicationType;
         if (groundingUrl && !isSearchFallback) {
             const lowerUrl = groundingUrl.toLowerCase();
-            if (lowerUrl.includes('abstract') || lowerUrl.includes('poster') || lowerUrl.includes('meeting')) {
+            const lowerTitle = finalTitle.toLowerCase();
+            if (lowerUrl.includes('abstract') || lowerUrl.includes('poster') || lowerUrl.includes('meeting') ||
+                lowerTitle.includes('abstract') || lowerTitle.includes('poster')) {
                 if (finalPubType !== PublicationType.Poster) {
                     finalPubType = PublicationType.ConferenceAbstract;
                 }
@@ -205,7 +231,7 @@ export const fetchLiteratureAnalysis = async (
             title: finalTitle.trim(),
             publicationType: finalPubType,
             authorsVerified: !isSearchFallback, // If we had to fallback, we can't fully verify authors
-            url: groundingUrl,
+            url: groundingUrl, // Use the verified grounding URL or the fallback
             isLive: true,
             isSearchFallback: isSearchFallback
         };
