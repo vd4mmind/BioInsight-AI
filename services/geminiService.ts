@@ -128,6 +128,7 @@ export const fetchLiteratureAnalysis = async (
         // --- STRICT GROUNDING SYNC LOGIC ---
         // 1. Attempt to find a direct verified match in Search Chunks with SCORING
         if (chunks && chunks.length > 0) {
+            // Normalize keeping some structure for word matching
             const normalize = (s: string) => s?.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim() || "";
             const paperTitleNorm = normalize(paper.title);
             
@@ -140,25 +141,30 @@ export const fetchLiteratureAnalysis = async (
                     const chunkTitleNorm = normalize(chunkTitle);
                     let score = 0;
 
-                    // A. Exact or Inclusion Match (High Confidence)
-                    if (chunkTitleNorm.includes(paperTitleNorm) || paperTitleNorm.includes(chunkTitleNorm)) {
-                        score += 100;
+                    // A. Exact Match (Highest Confidence)
+                    if (chunkTitleNorm === paperTitleNorm) {
+                        score = 100;
                     } 
-                    // B. Keyword Overlap (Medium Confidence)
+                    // B. Inclusion Match (High Confidence)
+                    else if (chunkTitleNorm.includes(paperTitleNorm) || paperTitleNorm.includes(chunkTitleNorm)) {
+                        score = 90;
+                    } 
+                    // C. Keyword Overlap (Medium Confidence)
                     else {
                          const paperWords = paperTitleNorm.split(/\s+/).filter(w => w.length > 3);
                          const chunkWords = chunkTitleNorm.split(/\s+/);
                          if (paperWords.length > 0) {
                              const matches = paperWords.filter(w => chunkWords.includes(w)).length;
                              const ratio = matches / paperWords.length;
-                             if (ratio > 0.5) score += (ratio * 80); // Up to 80 points
+                             if (ratio > 0.5) score = (ratio * 80); // Up to 80 points
                          }
                     }
                     return { chunk: c, score };
                 })
                 .sort((a, b) => b.score - a.score) // Sort by score descending
-                .find(item => item.score > 40); // Minimum threshold
+                .find(item => item.score > 45); // Threshold
 
+            // PRIORITIZE METADATA URL: If we found a good chunk, use its URL immediately.
             if (matchedChunk && matchedChunk.chunk) {
                 const c = matchedChunk.chunk;
                 groundingUrl = c.web.uri;
@@ -173,7 +179,7 @@ export const fetchLiteratureAnalysis = async (
                         ' - Nature', ' - Science', ' - ScienceDirect', 
                         ' - Medical Xpress', ' - EurekAlert!', ' - Stat News',
                         ' | NEJM', ' | The Lancet', ' | New England Journal of Medicine',
-                        ' | JAMA', ' | AHA Journals'
+                        ' | JAMA', ' | AHA Journals', ' : The Lancet'
                     ];
 
                     // Remove "Title | Journal" suffixes
@@ -194,8 +200,9 @@ export const fetchLiteratureAnalysis = async (
             }
         }
 
-        // 2. FALLBACK SAFETY NET (No Broken Links)
+        // 2. FALLBACK SAFETY NET
         // If no verified URL found from chunks, construct a smart Google Search URL.
+        // This acts as the "search fallback" if the model's hallucinated URL (if any) is discarded.
         if (!groundingUrl) {
              const queryParts = [paper.title];
              // Add first author if available (skip generic 'et al')
@@ -230,8 +237,8 @@ export const fetchLiteratureAnalysis = async (
             id: `live-${Math.random().toString(36).substring(2, 9)}`,
             title: finalTitle.trim(),
             publicationType: finalPubType,
-            authorsVerified: !isSearchFallback, // If we had to fallback, we can't fully verify authors
-            url: groundingUrl, // Use the verified grounding URL or the fallback
+            authorsVerified: !isSearchFallback, 
+            url: groundingUrl, // Always prioritized: Verified Chunk URL > Fallback Search URL. Model URL is ignored.
             isLive: true,
             isSearchFallback: isSearchFallback
         };

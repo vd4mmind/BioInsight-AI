@@ -103,8 +103,6 @@ const App: React.FC = () => {
     await new Promise(r => setTimeout(r, 800));
 
     // INTELLIGENCE TRACKER LOGIC:
-    // If specific filters are selected, we pass them to the API.
-    // We pass the current state of the checkboxes directly.
     const searchTopics = activeTopics;
     const searchStudyTypes = activeStudyTypes;
     const searchMethodologies = activeMethodologies;
@@ -113,7 +111,8 @@ const App: React.FC = () => {
     
     if (newPapers.length > 0) {
         setLivePapers(prev => {
-            const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+            // Normalizer that preserves spaces for accurate word/phrase boundary detection
+            const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
 
             const newUnique = newPapers.filter(np => {
                 const npTitle = normalize(np.title);
@@ -124,20 +123,31 @@ const App: React.FC = () => {
                     const opTitle = normalize(op.title);
                     const opAuthor = op.authors.length > 0 ? normalize(op.authors[0]) : '';
 
-                    // Match if titles are identical OR very similar (substring)
-                    // We check substring only if titles are reasonably long to avoid matching short acronyms
-                    const titleMatch = opTitle === npTitle || 
-                                     (opTitle.length > 15 && npTitle.length > 15 && (opTitle.includes(npTitle) || npTitle.includes(opTitle)));
+                    // Title Checks
+                    const isExactTitle = opTitle === npTitle;
+                    // Fuzzy title: strict substring match only if titles are substantial (>20 chars)
+                    const isFuzzyTitle = opTitle.length > 20 && npTitle.length > 20 && 
+                                        (opTitle.includes(npTitle) || npTitle.includes(opTitle));
 
-                    // Match if first authors are identical or substring (e.g. "Smith" vs "Smith J")
-                    const authorMatch = opAuthor === npAuthor || 
-                                      (opAuthor && npAuthor && (opAuthor.includes(npAuthor) || npAuthor.includes(opAuthor)));
+                    // Author Checks
+                    const isAuthorMatch = (opAuthor && npAuthor && (opAuthor.includes(npAuthor) || npAuthor.includes(opAuthor)));
+                    const isAuthorMissing = !opAuthor || !npAuthor;
 
-                    // A paper is a duplicate if Title AND Author match
-                    // If authors are missing in either, fall back to just title matching
-                    if (titleMatch) {
-                        return (!opAuthor || !npAuthor) ? true : authorMatch;
+                    // DEDUPLICATION RULES:
+                    
+                    // 1. Exact Title Match:
+                    // Consider duplicate if authors also match OR if one paper is missing author info (safety against lazy citations)
+                    if (isExactTitle) {
+                        return isAuthorMatch || isAuthorMissing;
                     }
+
+                    // 2. Fuzzy Title Match (Near Duplicate):
+                    // ONLY consider duplicate if Author ALSO matches. 
+                    // This prevents "Effect of X on Y" and "Effect of X on Z" being conflated unless same author.
+                    if (isFuzzyTitle && isAuthorMatch) {
+                        return true;
+                    }
+
                     return false;
                 });
                 

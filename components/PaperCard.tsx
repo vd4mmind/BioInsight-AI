@@ -70,7 +70,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
   };
 
   return (
-    <div className={`bg-slate-800 border-l-4 border-y border-r border-slate-700 rounded-r-xl p-5 mb-4 hover:bg-slate-800/80 transition-all duration-200 shadow-lg shadow-black/20 group relative overflow-hidden ${isLive ? 'border-l-blue-500 shadow-blue-900/10' : 'border-l-slate-600'}`}>
+    <div className={`bg-slate-800 border-l-4 border-y border-r border-slate-700 rounded-r-xl p-5 mb-4 transition-all duration-300 shadow-lg shadow-black/20 group relative overflow-hidden hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-900/10 ${isLive ? 'border-l-blue-500 shadow-blue-900/10' : 'border-l-slate-600'}`}>
         
         {/* Live Badge */}
         {isLive && (
