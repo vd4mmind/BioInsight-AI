@@ -104,10 +104,6 @@ const App: React.FC = () => {
 
     // INTELLIGENCE TRACKER LOGIC:
     // If specific filters are selected, we pass them to the API.
-    // If ALL are selected, we pass the full list (which the API interprets as broad or specific depending on implementation)
-    // Actually, simpler: just pass the active arrays. The Service logic handles the "if all are selected" optimization if needed,
-    // but for an "Intelligence Tracker", specific inputs = specific search.
-    
     // We pass the current state of the checkboxes directly.
     const searchTopics = activeTopics;
     const searchStudyTypes = activeStudyTypes;
@@ -117,8 +113,36 @@ const App: React.FC = () => {
     
     if (newPapers.length > 0) {
         setLivePapers(prev => {
-            // Deduplicate based on title
-            const newUnique = newPapers.filter(np => !prev.some(op => op.title === np.title));
+            const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+            const newUnique = newPapers.filter(np => {
+                const npTitle = normalize(np.title);
+                const npAuthor = np.authors.length > 0 ? normalize(np.authors[0]) : '';
+
+                // Check against existing papers
+                const isDuplicate = prev.some(op => {
+                    const opTitle = normalize(op.title);
+                    const opAuthor = op.authors.length > 0 ? normalize(op.authors[0]) : '';
+
+                    // Match if titles are identical OR very similar (substring)
+                    // We check substring only if titles are reasonably long to avoid matching short acronyms
+                    const titleMatch = opTitle === npTitle || 
+                                     (opTitle.length > 15 && npTitle.length > 15 && (opTitle.includes(npTitle) || npTitle.includes(opTitle)));
+
+                    // Match if first authors are identical or substring (e.g. "Smith" vs "Smith J")
+                    const authorMatch = opAuthor === npAuthor || 
+                                      (opAuthor && npAuthor && (opAuthor.includes(npAuthor) || npAuthor.includes(opAuthor)));
+
+                    // A paper is a duplicate if Title AND Author match
+                    // If authors are missing in either, fall back to just title matching
+                    if (titleMatch) {
+                        return (!opAuthor || !npAuthor) ? true : authorMatch;
+                    }
+                    return false;
+                });
+                
+                return !isDuplicate;
+            });
             return [...newUnique, ...prev];
         });
         setLastLiveUpdate(new Date());
