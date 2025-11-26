@@ -77,9 +77,9 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                 <div className="flex items-center gap-2 mb-1">
                     <ShieldCheck className="w-3 h-3 text-green-400" />
-                    <div className="text-green-400 text-xs font-bold">Anti-Hallucination Logic</div>
+                    <div className="text-green-400 text-xs font-bold">Metadata Scoring Algorithm</div>
                 </div>
-                <p className="text-slate-500 text-xs">Automated link checking with fallback to Search Query if a direct URL is unverified.</p>
+                <p className="text-slate-500 text-xs">Uses title/author confidence scoring (0-100) to prioritize verified sources over AI predictions.</p>
               </div>
             </div>
           </section>
@@ -97,13 +97,13 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                 <span className="text-slate-300 font-bold">Expanded Discovery:</span> Gemini executes a live search against Google's index, prioritizing major journals, <span className="text-blue-400">Preprint Servers</span>, <span className="text-blue-400">Conference Posters</span>, and <span className="text-blue-400">Meeting Abstracts</span> from the last 30 days.
               </li>
               <li>
-                <span className="text-slate-300 font-bold">AI Synthesis & Parsing:</span> The model processes raw search results into structured clinical data, extracting authors, affiliations, and generating one-sentence abstract highlights.
+                <span className="text-slate-300 font-bold">AI Synthesis & Deduplication:</span> The model extracts structured clinical data and performs <span className="text-blue-400">multi-factor deduplication</span> (checking both Titles and Authors) to remove redundant preprint versions.
               </li>
               <li>
-                <span className="text-slate-300 font-bold">Smart Link Verification:</span> Incoming titles are cross-referenced with Google Search metadata. 
+                <span className="text-slate-300 font-bold">Smart Link Verification:</span> Incoming titles are scored against Google Search metadata. 
                 <ul className="pl-5 mt-1 space-y-1 list-disc text-slate-500">
-                   <li>If a direct URL is verified, it is displayed as <span className="text-blue-400">"Read Source"</span>.</li>
-                   <li>If the specific URL is ambiguous, the system provides a <span className="text-slate-300">"Find Source"</span> fallback link to prevent broken URLs.</li>
+                   <li><span className="text-green-400">High Confidence (>90):</span> Exact matches get direct <span className="text-blue-400">"Read Source"</span> links.</li>
+                   <li><span className="text-amber-400">Low Confidence:</span> If no direct match is found, we generate a <span className="text-slate-300">"Find Source"</span> fallback query to ensure you never hit a broken link.</li>
                 </ul>
               </li>
             </ol>
