@@ -29,6 +29,17 @@ const App: React.FC = () => {
       return [];
     }
   });
+
+  // User Ratings (Persisted)
+  const [userRatings, setUserRatings] = useState<Record<string, 'up' | 'down'>>(() => {
+    try {
+      const saved = localStorage.getItem('bioinsight_ratings');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error("Failed to load ratings", e);
+      return {};
+    }
+  });
   
   // UI State
   const [activeTab, setActiveTab] = useState<'archive' | 'live' | 'bookmarks'>('archive');
@@ -47,6 +58,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('bioinsight_bookmarks', JSON.stringify(savedPapers));
   }, [savedPapers]);
+
+  useEffect(() => {
+    localStorage.setItem('bioinsight_ratings', JSON.stringify(userRatings));
+  }, [userRatings]);
 
   // --- FILTERING LOGIC ---
   const currentPapers = activeTab === 'archive' ? archivePapers : 
@@ -79,6 +94,14 @@ const App: React.FC = () => {
 
     // Sort Logic
     return filtered.sort((a, b) => {
+        // Boost papers rated 'up' by the user
+        const aRating = userRatings[a.id] === 'up' ? 1 : (userRatings[a.id] === 'down' ? -1 : 0);
+        const bRating = userRatings[b.id] === 'up' ? 1 : (userRatings[b.id] === 'down' ? -1 : 0);
+        
+        if (aRating !== bRating) {
+            return bRating - aRating; // Higher rating first
+        }
+
         if (sortBy === 'date') {
             return new Date(b.date).getTime() - new Date(a.date).getTime();
         } else {
@@ -86,7 +109,7 @@ const App: React.FC = () => {
             return (b.validationScore - a.validationScore) || (new Date(b.date).getTime() - new Date(a.date).getTime());
         }
     });
-  }, [currentPapers, activeTopics, activeStudyTypes, activeMethodologies, eraFilter, activeTab, sortBy]);
+  }, [currentPapers, activeTopics, activeStudyTypes, activeMethodologies, eraFilter, activeTab, sortBy, userRatings]);
 
   // --- STATS LOGIC ---
   const stats = useMemo(() => {
@@ -123,6 +146,18 @@ const App: React.FC = () => {
             // Add (ensure we save a clean copy)
             return [paper, ...prev];
         }
+    });
+  };
+
+  const handleRatePaper = (paperId: string, rating: 'up' | 'down') => {
+    setUserRatings(prev => {
+        // Toggle off if clicking the same rating
+        if (prev[paperId] === rating) {
+            const copy = { ...prev };
+            delete copy[paperId];
+            return copy;
+        }
+        return { ...prev, [paperId]: rating };
     });
   };
 
@@ -420,6 +455,8 @@ const App: React.FC = () => {
                             paper={paper} 
                             isBookmarked={savedPapers.some(p => p.id === paper.id || (p.title === paper.title && p.authors?.[0] === paper.authors?.[0]))}
                             onToggleBookmark={() => handleToggleBookmark(paper)}
+                            userRating={userRatings[paper.id]}
+                            onRate={(rating) => handleRatePaper(paper.id, rating)}
                         />
                     ))
                 )}

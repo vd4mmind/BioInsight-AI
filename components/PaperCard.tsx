@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { PaperData, PublicationType, StudyType, Methodology, ResearchModality } from '../types';
-import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Activity, Biohazard, Newspaper, Radio, Sparkles, Search, Bookmark } from 'lucide-react';
+import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Activity, Biohazard, Newspaper, Radio, Sparkles, Search, Bookmark, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 interface PaperCardProps {
   paper: PaperData;
   isBookmarked: boolean;
   onToggleBookmark: () => void;
+  userRating?: 'up' | 'down';
+  onRate: (rating: 'up' | 'down') => void;
 }
 
-export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onToggleBookmark }) => {
+export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onToggleBookmark, userRating, onRate }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   
@@ -71,8 +73,21 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
       return 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10';
   };
 
+  // Border & Shadow logic based on Rating
+  let containerClasses = `bg-slate-800 border-l-4 border-y border-r rounded-r-xl p-5 mb-4 transition-all duration-300 shadow-lg shadow-black/20 group relative overflow-hidden hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-900/10`;
+  
+  if (userRating === 'up') {
+      containerClasses += ` border-l-green-500 border-slate-700 shadow-green-900/10`;
+  } else if (userRating === 'down') {
+      containerClasses += ` border-l-slate-600 border-slate-700 opacity-60 hover:opacity-100 grayscale-[0.5] hover:grayscale-0`;
+  } else if (isLive) {
+      containerClasses += ` border-l-blue-500 border-slate-700 shadow-blue-900/10`;
+  } else {
+      containerClasses += ` border-l-slate-600 border-slate-700`;
+  }
+
   return (
-    <div className={`bg-slate-800 border-l-4 border-y border-r border-slate-700 rounded-r-xl p-5 mb-4 transition-all duration-300 shadow-lg shadow-black/20 group relative overflow-hidden hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-900/10 ${isLive ? 'border-l-blue-500 shadow-blue-900/10' : 'border-l-slate-600'}`}>
+    <div className={containerClasses}>
         
         {/* Live Badge */}
         {isLive && (
@@ -82,8 +97,16 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
             </div>
         )}
 
+        {/* User Rated Badge */}
+        {userRating === 'up' && !isLive && (
+            <div className="absolute top-0 right-0 bg-gradient-to-l from-green-600 to-emerald-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg shadow-lg z-10 flex items-center gap-1.5">
+                <ThumbsUp className="w-3 h-3" />
+                RELEVANT
+            </div>
+        )}
+
         {/* Background decorative element */}
-        <div className={`absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 rounded-full blur-2xl pointer-events-none transition-colors ${isLive ? 'bg-blue-500/10 group-hover:bg-blue-500/20' : 'bg-slate-500/5 group-hover:bg-slate-500/10'}`}></div>
+        <div className={`absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 rounded-full blur-2xl pointer-events-none transition-colors ${userRating === 'up' ? 'bg-green-500/10' : isLive ? 'bg-blue-500/10 group-hover:bg-blue-500/20' : 'bg-slate-500/5 group-hover:bg-slate-500/10'}`}></div>
 
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start">
         <div className="flex-1 space-y-3 w-full">
@@ -258,19 +281,45 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
         {/* Side Stats / Validation */}
         <div className="flex flex-row md:flex-col gap-3 md:w-32 shrink-0 items-center md:items-end border-t md:border-t-0 border-slate-700/50 pt-3 md:pt-0 w-full md:h-full justify-between md:justify-start">
             
-            {/* Bookmark Button */}
-            <button 
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleBookmark();
-                }}
-                className={`p-2 rounded-lg transition-colors ${isBookmarked ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-200'}`}
-                title={isBookmarked ? "Remove from bookmarks" : "Save for later"}
-            >
-                <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
-            </button>
+            {/* Action Buttons Group */}
+            <div className="flex md:flex-col items-center gap-2">
+                <button 
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleBookmark();
+                    }}
+                    className={`p-2 rounded-lg transition-colors ${isBookmarked ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-200'}`}
+                    title={isBookmarked ? "Remove from bookmarks" : "Save for later"}
+                >
+                    <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+                </button>
+                
+                {/* Rating Buttons */}
+                <div className="flex md:flex-col gap-1 md:gap-2">
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onRate('up');
+                        }}
+                        className={`p-2 rounded-lg transition-colors ${userRating === 'up' ? 'bg-green-500 text-white shadow-lg shadow-green-500/25' : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-green-400'}`}
+                        title="Relevant"
+                    >
+                        <ThumbsUp className={`w-3.5 h-3.5 ${userRating === 'up' ? 'fill-current' : ''}`} />
+                    </button>
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onRate('down');
+                        }}
+                        className={`p-2 rounded-lg transition-colors ${userRating === 'down' ? 'bg-red-500 text-white shadow-lg shadow-red-500/25' : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-red-400'}`}
+                        title="Not Relevant"
+                    >
+                        <ThumbsDown className={`w-3.5 h-3.5 ${userRating === 'down' ? 'fill-current' : ''}`} />
+                    </button>
+                </div>
+            </div>
 
-            <div className={`flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 ${getValidationColor(paper.validationScore)}`}>
+            <div className={`hidden md:flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 ${getValidationColor(paper.validationScore)}`}>
                 <span className="text-lg font-bold">{paper.validationScore}</span>
                 <span className="text-[8px] uppercase font-bold">Score</span>
             </div>
