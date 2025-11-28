@@ -41,39 +41,66 @@ export const fetchLiteratureAnalysis = async (
   try {
     const modelId = "gemini-2.5-flash"; 
     
-    // Calculate date for "Last 30 Days"
+    // --- DATE LOGIC ---
+    // 1. Calculate strict 30-day cutoff
     const today = new Date();
-    const pastDate = new Date(today);
-    pastDate.setDate(today.getDate() - 30);
-    const dateString = pastDate.toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    const dateString = thirtyDaysAgo.toISOString().split('T')[0];
 
-    // --- INTELLIGENCE TRACKER QUERY BUILDER ---
+    // 2. Generate Search Context Keywords (e.g., "May 2024", "June 2024")
+    // This forces the Search Tool to look for recent content rather than just "relevant" content.
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const currentMonth = monthNames[today.getMonth()];
+    const prevMonth = monthNames[thirtyDaysAgo.getMonth()];
+    const currentYear = today.getFullYear();
+    const prevYear = thirtyDaysAgo.getFullYear();
     
-    // 2. Intelligence Tracker Prompt
+    const timeContext = currentMonth === prevMonth 
+        ? `${currentMonth} ${currentYear}`
+        : `${prevMonth} ${prevYear} OR ${currentMonth} ${currentYear}`;
+
+    // --- LOGIC: VERTICALS vs HORIZONTALS ---
+    const isBroadSearch = activeTopics.length === 0 || activeTopics.length > 4;
+    const topicInstruction = isBroadSearch 
+        ? "Cardiovascular, Kidney, Metabolic, Obesity, or Diabetes"
+        : activeTopics.join(', ');
+
+    const methodInstruction = activeMethodologies.length > 0 
+        ? `MUST utilize one of: ${activeMethodologies.join(', ')}` 
+        : "Any Methodology";
+
+    const studyInstruction = activeStudyTypes.length > 0 
+        ? `MUST be one of: ${activeStudyTypes.join(', ')}` 
+        : "Any Study Type";
+
+    // 3. Intelligence Tracker Prompt
     const discoveryPrompt = `
       You are **BioInsight**, a specialized Biomedical Intelligence Scout.
       
       **MISSION:**
-      Perform a deep intelligence sweep of the web for the **LATEST (Last 30 Days)** scientific outputs.
-      You are looking for the **INTERSECTION** of the provided Disease Topics, Study Designs, and Methodologies.
+      Find the **LATEST (Last 30 Days)** scientific papers, preprints, and posters.
       
-      **SEARCH PARAMETERS:**
-      - **Timeframe:** Since ${dateString} (Strictly recent).
-      - **Target Topics:** ${activeTopics.length > 0 ? activeTopics.join(', ') : "Cardiovascular, Kidney, Metabolic, Obesity, Diabetes"}
-      - **Target Methods:** ${activeMethodologies.length > 0 ? activeMethodologies.join(', ') : "Any Methodology"}
-      - **Target Study Types:** ${activeStudyTypes.length > 0 ? activeStudyTypes.join(', ') : "Any Study Type"}
+      **STRICT TIMEFRAME:**
+      - **Current Date:** ${today.toISOString().split('T')[0]}
+      - **Cutoff Date:** ${dateString}
+      - **Search Keyword Constraint:** Use "${timeContext}" in your search queries to ensure recency.
+      - **Rejection Rule:** DO NOT return any content published before ${dateString}. If a paper is from 2023 or early 2024, IGNORE IT.
 
-      **PRIORITY SOURCES (The "Discovery" Mix):**
-      1. **Conference Posters/Abstracts**: Scrape recent meeting outputs (e.g., ADA, EASL, AHA, ACC) for "late-breaking" science.
-      2. **Preprints**: Search BioRxiv/MedRxiv for manuscripts uploaded in the last month.
-      3. **High-Impact Articles**: Nature, NEJM, Lancet, Cell (published recently).
-      4. **Tech/Bio Intersection**: Papers applying AI/ML or Omics to these specific diseases.
+      **SEARCH LOGIC:**
+      1. **DISEASE VERTICALS (The 'OR' Condition):**
+         Search for papers in: ${topicInstruction}.
+         *Constraint:* Do not look for the intersection of all topics. Look for papers about Topic A OR papers about Topic B.
+      
+      2. **METHODOLOGY/DESIGN FILTERS (The 'AND' Condition):**
+         Filter results to match:
+         - **Methodology:** ${methodInstruction}
+         - **Study Type:** ${studyInstruction}
 
-      **EXECUTION RULES:**
-      - **Exact Titles Only**: Extract the verbatim title from the search result. Do not fabricate titles.
-      - **URL Handling**: Leave the 'url' field empty in your JSON. The system will auto-match it.
-      - **Diversify**: Try to find at least one Poster or Abstract if possible.
-      - **Quantity**: Return between 5 and 10 distinct items.
+      **PRIORITY SOURCES:**
+      - BioRxiv/MedRxiv (${timeContext})
+      - Major Medical Conferences (${timeContext})
+      - High-Impact Journals (${timeContext})
 
       **OUTPUT FORMAT:**
       Return a **STRICT JSON array** inside a \`\`\`json\`\`\` block.
@@ -81,21 +108,21 @@ export const fetchLiteratureAnalysis = async (
       JSON Schema per item:
       {
         "title": "Exact Title from source",
-        "journalOrConference": "Source (e.g., 'BioRxiv', 'ADA 2024 Poster', 'Nature Medicine')",
+        "journalOrConference": "Source name",
         "date": "YYYY-MM-DD",
         "authors": ["Author 1", "Author 2", "et al."],
-        "topic": "One from: ${Object.values(DiseaseTopic).join(', ')}",
+        "topic": "Most relevant topic from user list",
         "publicationType": "One from: ${Object.values(PublicationType).join(', ')}",
         "studyType": "One from: ${Object.values(StudyType).join(', ')}",
         "methodology": "One from: ${Object.values(Methodology).join(', ')}",
         "modality": "One from: ${Object.values(ResearchModality).join(', ')}",
-        "abstractHighlight": "Key quantitative finding (e.g., 'HR 0.85, p<0.001').",
+        "abstractHighlight": "Key quantitative finding.",
         "drugAndTarget": "Drug/Target or N/A",
-        "context": "Short tag why this matters (e.g., '🔥 Viral Preprint', '📊 ADA Poster')",
+        "context": "Why it matters (e.g. '🔥 New Preprint')",
         "validationScore": 90,
         "url": null, 
-        "affiliations": ["Institution Name"],
-        "funding": "Funding source",
+        "affiliations": ["Institution"],
+        "funding": "Funding",
         "keywords": ["Tag1", "Tag2"]
       }
     `;
@@ -113,16 +140,12 @@ export const fetchLiteratureAnalysis = async (
         }
       });
     } catch (e) {
-      console.warn("Search Grounding failed (likely 500/XHR error). Retrying without tools.", e);
-      // ATTEMPT 2: Fallback to basic generation without tools
+      console.warn("Search Grounding failed. Retrying without tools.", e);
       try {
         discoveryResponse = await ai.models.generateContent({
           model: modelId,
           contents: discoveryPrompt,
-          config: {
-            temperature: 0.3,
-            // No tools
-          }
+          config: { temperature: 0.3 }
         });
       } catch (retryError) {
         console.error("Fallback generation also failed.", retryError);
@@ -134,27 +157,34 @@ export const fetchLiteratureAnalysis = async (
     const rawData = parseJSON(textResponse);
     
     if (!Array.isArray(rawData)) {
-        console.warn("Discovery phase returned invalid format.", textResponse.substring(0, 100));
         return [];
     }
 
+    // --- HARD FILTER: DISCARD OLD PAPERS ---
+    // Even if the LLM returns an old paper, we filter it out here.
+    const validTimeframeData = rawData.filter((paper: any) => {
+        if (!paper.date) return false;
+        const paperDate = new Date(paper.date);
+        // Check if date is valid and is after the cutoff (with a 24h buffer for timezone diffs)
+        const cutoffBuffer = new Date(thirtyDaysAgo);
+        cutoffBuffer.setDate(cutoffBuffer.getDate() - 1); 
+        
+        return !isNaN(paperDate.getTime()) && paperDate >= cutoffBuffer;
+    });
+
     // Hydrate with IDs and Grounding Logic
-    const candidates = rawData.map((paper: any) => {
+    const candidates = validTimeframeData.map((paper: any) => {
         let groundingUrl: string | undefined = undefined;
         let finalTitle = paper.title; 
         let isSearchFallback = false;
 
-        // Check if we have grounding chunks (only available if Attempt 1 succeeded)
+        // Check if we have grounding chunks
         const chunks = discoveryResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
         
-        // --- STRICT GROUNDING SYNC LOGIC ---
-        // 1. Attempt to find a direct verified match in Search Chunks with SCORING
         if (chunks && chunks.length > 0) {
-            // Normalize keeping some structure for word matching
             const normalize = (s: string) => s?.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim() || "";
             const paperTitleNorm = normalize(paper.title);
             
-            // Find best matching chunk using a scoring system to prioritize metadata
             const matchedChunk = chunks
                 .map((c: any) => {
                     const chunkTitle = c.web?.title;
@@ -163,48 +193,32 @@ export const fetchLiteratureAnalysis = async (
                     const chunkTitleNorm = normalize(chunkTitle);
                     let score = 0;
 
-                    // A. Exact Match (Highest Confidence)
                     if (chunkTitleNorm === paperTitleNorm) {
                         score = 100;
-                    } 
-                    // B. Inclusion Match (High Confidence)
-                    else if (chunkTitleNorm.includes(paperTitleNorm) || paperTitleNorm.includes(chunkTitleNorm)) {
+                    } else if (chunkTitleNorm.includes(paperTitleNorm) || paperTitleNorm.includes(chunkTitleNorm)) {
                         score = 90;
-                    } 
-                    // C. Keyword Overlap (Medium Confidence)
-                    else {
+                    } else {
                          const paperWords = paperTitleNorm.split(/\s+/).filter(w => w.length > 3);
                          const chunkWords = chunkTitleNorm.split(/\s+/);
                          if (paperWords.length > 0) {
                              const matches = paperWords.filter(w => chunkWords.includes(w)).length;
                              const ratio = matches / paperWords.length;
-                             if (ratio > 0.5) score = (ratio * 80); // Up to 80 points
+                             if (ratio > 0.5) score = (ratio * 80);
                          }
                     }
                     return { chunk: c, score };
                 })
-                .sort((a, b) => b.score - a.score) // Sort by score descending
-                .find(item => item.score > 45); // Threshold
+                .sort((a, b) => b.score - a.score)
+                .find(item => item.score > 45);
 
-            // PRIORITIZE METADATA URL: If we found a good chunk, use its URL immediately.
             if (matchedChunk && matchedChunk.chunk) {
                 const c = matchedChunk.chunk;
                 groundingUrl = c.web.uri;
                 
-                // Use the verified Source Title if it's substantial
                 if (c.web.title && c.web.title.length > 10) {
                     finalTitle = c.web.title;
+                    const commonSuffixes = [' - PubMed', ' - NCBI', ' - BioRxiv', ' - MedRxiv', ' - Nature', ' - Science', ' | NEJM', ' | The Lancet'];
                     
-                    // CLEANUP: Remove common SEO suffixes
-                    const commonSuffixes = [
-                        ' - PubMed', ' - NCBI', ' - BioRxiv', ' - MedRxiv', 
-                        ' - Nature', ' - Science', ' - ScienceDirect', 
-                        ' - Medical Xpress', ' - EurekAlert!', ' - Stat News',
-                        ' | NEJM', ' | The Lancet', ' | New England Journal of Medicine',
-                        ' | JAMA', ' | AHA Journals', ' : The Lancet'
-                    ];
-
-                    // Remove "Title | Journal" suffixes
                     if (finalTitle.includes(' | ')) {
                         const parts = finalTitle.split(' | ');
                         if (parts.length > 1 && parts[parts.length-1].length < 30) {
@@ -213,7 +227,6 @@ export const fetchLiteratureAnalysis = async (
                         }
                     }
 
-                    // Remove " - Source" suffixes case-insensitively
                     for (const suffix of commonSuffixes) {
                         const regex = new RegExp(suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
                         finalTitle = finalTitle.replace(regex, '');
@@ -222,16 +235,11 @@ export const fetchLiteratureAnalysis = async (
             }
         }
 
-        // 2. FALLBACK SAFETY NET
-        // If no verified URL found from chunks, construct a smart Google Search URL.
-        // This acts as the "search fallback" if the model's hallucinated URL (if any) is discarded.
         if (!groundingUrl) {
              const queryParts = [paper.title];
-             // Add first author if available (skip generic 'et al')
              if (paper.authors?.[0] && !paper.authors[0].toLowerCase().includes('et al')) {
                  queryParts.push(paper.authors[0]);
              }
-             // Add journal if available
              if (paper.journalOrConference) {
                  queryParts.push(paper.journalOrConference);
              }
@@ -241,7 +249,6 @@ export const fetchLiteratureAnalysis = async (
              isSearchFallback = true;
         }
 
-        // Logic to detect Posters/Abstracts based on URL or Title keywords if the model missed it
         let finalPubType = paper.publicationType;
         if (groundingUrl && !isSearchFallback) {
             const lowerUrl = groundingUrl.toLowerCase();
@@ -260,7 +267,7 @@ export const fetchLiteratureAnalysis = async (
             title: finalTitle.trim(),
             publicationType: finalPubType,
             authorsVerified: !isSearchFallback, 
-            url: groundingUrl, // Always prioritized: Verified Chunk URL > Fallback Search URL. Model URL is ignored.
+            url: groundingUrl, 
             isLive: true,
             isSearchFallback: isSearchFallback
         };
