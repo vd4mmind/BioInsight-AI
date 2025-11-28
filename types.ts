@@ -13,7 +13,9 @@ export enum PublicationType {
   PeerReviewed = 'Peer Reviewed',
   News = 'News/Analysis',
   ConferenceAbstract = 'Conference Abstract',
-  Poster = 'Poster'
+  Poster = 'Poster',
+  ReviewArticle = 'Review Article',
+  MetaAnalysis = 'Meta-Analysis'
 }
 
 export enum StudyType {
@@ -67,7 +69,6 @@ export interface PaperData {
   funding?: string;
   keywords?: string[];
   isLive?: boolean;
-  isSearchFallback?: boolean; // New flag for UI handling of fallback links
 }
 
 export interface DashboardStats {

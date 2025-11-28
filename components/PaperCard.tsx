@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { PaperData, PublicationType, StudyType, Methodology, ResearchModality } from '../types';
-import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Activity, Biohazard, Newspaper, Radio, Sparkles, Search, Bookmark, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { PaperData, PublicationType, Methodology, ResearchModality } from '../types';
+import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Radio, Sparkles, Bookmark, ThumbsUp, ThumbsDown, Biohazard, Newspaper, Microscope, BookOpen, Scale } from 'lucide-react';
 
 interface PaperCardProps {
   paper: PaperData;
@@ -17,6 +17,8 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
   const isPreprint = paper.publicationType === PublicationType.Preprint;
   const isNews = paper.publicationType === PublicationType.News;
   const isLive = paper.isLive;
+  const isReview = paper.publicationType === PublicationType.ReviewArticle;
+  const isMetaAnalysis = paper.publicationType === PublicationType.MetaAnalysis;
   
   const getValidationColor = (score: number) => {
     if (score >= 90) return 'text-green-400 border-green-400/30 bg-green-400/10';
@@ -70,6 +72,8 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
   const getTypeStyles = () => {
       if (isPreprint) return 'text-amber-400 border-amber-400/30 bg-amber-400/10';
       if (isNews) return 'text-orange-400 border-orange-400/30 bg-orange-400/10';
+      if (isReview) return 'text-purple-400 border-purple-400/30 bg-purple-400/10';
+      if (isMetaAnalysis) return 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10';
       return 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10';
   };
 
@@ -93,7 +97,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
         {isLive && (
             <div className="absolute top-0 right-0 bg-gradient-to-l from-blue-600 to-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg shadow-lg z-10 flex items-center gap-1.5">
                 <Radio className="w-3 h-3 animate-pulse" />
-                LIVE DISCOVERY
+                LIVE
             </div>
         )}
 
@@ -109,11 +113,14 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
         <div className={`absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 rounded-full blur-2xl pointer-events-none transition-colors ${userRating === 'up' ? 'bg-green-500/10' : isLive ? 'bg-blue-500/10 group-hover:bg-blue-500/20' : 'bg-slate-500/5 group-hover:bg-slate-500/10'}`}></div>
 
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start">
-        <div className="flex-1 space-y-3 w-full">
+        <div className="flex-1 space-y-3 w-full min-w-0">
             {/* Header Row: Type & Tags */}
             <div className="flex flex-wrap items-center gap-2 mb-1 pr-20">
                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border flex items-center gap-1 ${getTypeStyles()}`}>
                     {isNews && <Newspaper className="w-3 h-3" />}
+                    {isReview && <BookOpen className="w-3 h-3" />}
+                    {isMetaAnalysis && <Scale className="w-3 h-3" />}
+                    {(!isNews && !isReview && !isMetaAnalysis) && <FileText className="w-3 h-3" />}
                     {paper.publicationType}
                 </span>
                 <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border text-slate-300 border-slate-600 bg-slate-700/50">
@@ -124,30 +131,19 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
                 </span>
             </div>
 
-            {/* Live Discovery Context (Headline) */}
-            {isLive && paper.context && (
-                <div className="flex items-center gap-2 mb-2">
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.15)]">
-                         <Sparkles className="w-3 h-3 text-blue-400 animate-pulse" />
-                         <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider">
-                            {paper.context}
-                         </span>
-                    </div>
-                </div>
-            )}
-
             {/* Title - CLICKABLE LINK */}
             {paper.url ? (
                  <a 
                     href={paper.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block text-lg font-bold text-slate-100 leading-snug hover:text-blue-400 transition-colors cursor-pointer decoration-blue-400/20 hover:decoration-blue-400 underline-offset-4"
+                    className="block text-lg font-bold text-slate-100 leading-snug hover:text-blue-400 transition-colors cursor-pointer decoration-blue-400/20 hover:decoration-blue-400 underline-offset-4 line-clamp-2"
+                    title={paper.title}
                  >
                     {paper.title} <ExternalLink className="inline w-3.5 h-3.5 ml-1 opacity-50 mb-1" />
                  </a>
             ) : (
-                <h3 className="text-lg font-bold text-slate-100 leading-snug group-hover:text-blue-400 transition-colors cursor-pointer">
+                <h3 className="text-lg font-bold text-slate-100 leading-snug group-hover:text-blue-400 transition-colors cursor-pointer line-clamp-2" title={paper.title}>
                     {paper.title}
                 </h3>
             )}
@@ -162,13 +158,9 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
                 <span className="text-slate-600">|</span>
                 <span>{paper.date}</span>
                 <span className="text-slate-600">|</span>
-                <div className="flex items-center gap-1.5" title={paper.authorsVerified ? "Authors Verified: Cross-referenced with scientific databases" : "Authors Simulated: Illustrative or not found in databases"}>
-                    <span className="italic truncate max-w-[200px] sm:max-w-[300px]">{paper.authors.join(', ')}</span>
-                    {paper.authorsVerified ? (
-                        <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-                    ) : (
-                        <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
-                    )}
+                <div className="flex items-center gap-1.5" title="Authors Verified">
+                    <span className="italic truncate max-w-[150px] sm:max-w-[250px]">{paper.authors.join(', ')}</span>
+                    <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
                 </div>
             </div>
 
@@ -193,28 +185,17 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
                 </div>
                 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-                    {/* For live papers, we showed context at the top. For archive, we show here. */}
-                    {!isLive ? (
-                        <div className="text-xs text-slate-500 italic pr-2 truncate">
-                            Context: {paper.context}
-                        </div>
-                    ) : (
-                         <div className="text-xs text-slate-500 italic pr-2">
-                            {/* Empty or auxiliary info for live items */}
-                        </div>
-                    )}
+                    <div className="text-xs text-slate-500 italic pr-2 truncate">
+                        {paper.context && `Context: ${paper.context}`}
+                    </div>
 
                     {isLive ? (
                         <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border text-blue-400 border-blue-400/20 bg-blue-400/5">
-                            AI Discovered <Sparkles className="w-3 h-3" />
+                            Verified Source <CheckCircle2 className="w-3 h-3" />
                         </div>
                     ) : (
-                        <div className={`flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${paper.authorsVerified ? 'text-blue-400 border-blue-400/20 bg-blue-400/5' : 'text-amber-400 border-amber-400/20 bg-amber-400/5'}`}>
-                            {paper.authorsVerified ? (
-                                <>Verified <CheckCircle2 className="w-3 h-3" /></>
-                            ) : (
-                                <>Simulated <ShieldAlert className="w-3 h-3" /></>
-                            )}
+                        <div className={`flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border text-blue-400 border-blue-400/20 bg-blue-400/5`}>
+                            Verified <CheckCircle2 className="w-3 h-3" />
                         </div>
                     )}
                 </div>
@@ -346,13 +327,9 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
                             href={paper.url} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${paper.isSearchFallback ? 'text-slate-300 bg-slate-700/50 hover:bg-slate-700' : 'text-blue-400 hover:text-blue-300 underline decoration-blue-400/30 hover:decoration-blue-300'}`}
+                            className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors text-blue-400 hover:text-blue-300 underline decoration-blue-400/30 hover:decoration-blue-300`}
                         >
-                            {paper.isSearchFallback ? (
-                                <>Find Source <Search className="w-3 h-3" /></>
-                            ) : (
-                                <>{isNews ? 'Read Article' : 'Read Source'} <ExternalLink className="w-3 h-3" /></>
-                            )}
+                            <>{isNews ? 'Read Article' : 'Read Source'} <ExternalLink className="w-3 h-3" /></>
                         </a>
                     </div>
                 )}

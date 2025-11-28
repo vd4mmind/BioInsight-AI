@@ -1,6 +1,6 @@
 import React from 'react';
 import { DiseaseTopic, StudyType, Methodology } from '../types';
-import { Filter, ChevronDown, CalendarRange, FlaskConical, Microscope, Clock, Check, Radio } from 'lucide-react';
+import { Filter, ChevronDown, CalendarRange, FlaskConical, Microscope, Clock, Check, Radio, Ban } from 'lucide-react';
 
 interface SidebarProps {
   activeTopics: DiseaseTopic[];
@@ -11,7 +11,7 @@ interface SidebarProps {
   toggleMethodology: (methodology: Methodology) => void;
   eraFilter: 'all' | '5years' | '1year';
   setEraFilter: (era: 'all' | '5years' | '1year') => void;
-  isLiveMode: boolean; // NEW PROP
+  isLiveMode: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
@@ -28,12 +28,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside className="w-full lg:w-64 shrink-0 space-y-6 mb-6 lg:mb-0">
       
-      {/* Era Filter - VISUALLY DISABLED IN LIVE MODE */}
-      <div className={`bg-slate-800 border border-slate-700 rounded-xl p-4 transition-opacity duration-300 ${isLiveMode ? 'opacity-50 pointer-events-none grayscale' : 'opacity-100'}`}>
+      {/* Era Filter */}
+      <div className={`bg-slate-800 border border-slate-700 rounded-xl p-4 transition-all duration-300 ${isLiveMode ? 'opacity-40 pointer-events-none grayscale' : 'opacity-100'}`}>
          <div className="flex items-center gap-2 mb-3 text-slate-300 font-semibold">
           <Clock className="w-4 h-4" />
           <span>Timeline</span>
-          {isLiveMode && <span className="text-[10px] bg-slate-700 px-2 py-0.5 rounded text-slate-300 ml-auto">Fixed: Last 30d</span>}
+          {isLiveMode && <span className="text-[10px] bg-slate-700 px-2 py-0.5 rounded text-slate-300 ml-auto">Last 30d</span>}
         </div>
         
         <div className="space-y-1">
@@ -61,8 +61,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Topics Panel */}
-      <div className={`bg-slate-800 border border-slate-700 rounded-xl p-4 ${isLiveMode ? 'border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : ''}`}>
+      {/* Topics Panel (ALWAYS ACTIVE) */}
+      <div className={`bg-slate-800 border border-slate-700 rounded-xl p-4 ${isLiveMode ? 'border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)] ring-1 ring-blue-500/20' : ''}`}>
         <div className="flex items-center gap-2 mb-4 text-slate-300 font-semibold">
           {isLiveMode ? <Radio className="w-4 h-4 text-blue-400 animate-pulse" /> : <Filter className="w-4 h-4" />}
           <span>Disease Topics</span>
@@ -85,13 +85,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Study Types Panel */}
-      <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+      {/* Study Types Panel - MASKED IN LIVE MODE */}
+      <div className={`bg-slate-800 border border-slate-700 rounded-xl p-4 transition-all duration-300 ${isLiveMode ? 'opacity-40 pointer-events-none grayscale' : 'opacity-100'}`}>
         <div className="flex items-center gap-2 mb-4 text-slate-300 font-semibold">
           <FlaskConical className="w-4 h-4" />
           <span>Study Design</span>
+          {isLiveMode && <span className="ml-auto text-[9px] uppercase tracking-wider text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">Auto-Detect</span>}
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 relative">
+           {isLiveMode && (
+             <div className="absolute inset-0 z-10 flex items-center justify-center">
+             </div>
+           )}
           {Object.values(StudyType).map((type) => (
             <label key={type} className="flex items-center gap-3 cursor-pointer group">
               <div className="relative flex items-center">
@@ -109,11 +114,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Methodology Panel */}
-      <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+      {/* Methodology Panel - MASKED IN LIVE MODE */}
+      <div className={`bg-slate-800 border border-slate-700 rounded-xl p-4 transition-all duration-300 ${isLiveMode ? 'opacity-40 pointer-events-none grayscale' : 'opacity-100'}`}>
         <div className="flex items-center gap-2 mb-4 text-slate-300 font-semibold">
           <Microscope className="w-4 h-4" />
           <span>Methodology</span>
+           {isLiveMode && <span className="ml-auto text-[9px] uppercase tracking-wider text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">Auto-Detect</span>}
         </div>
         <div className="space-y-2">
           {Object.values(Methodology).map((methodology) => (
@@ -133,15 +139,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
       
-      <div className="bg-gradient-to-b from-indigo-900/20 to-slate-900 border border-indigo-500/30 rounded-xl p-4">
-         <h4 className="text-indigo-300 font-bold text-sm mb-2">Pro Insight</h4>
-         <p className="text-xs text-indigo-200/70 mb-3">
-            Trend Alert: "In-vivo Imaging" combined with "AI/ML" has seen a 40% uptick in BioRxiv this month.
-         </p>
-         <div className="h-1 w-full bg-indigo-900/50 rounded-full overflow-hidden">
-            <div className="h-full bg-indigo-500 w-3/4"></div>
-         </div>
-      </div>
+      {!isLiveMode && (
+        <div className="bg-gradient-to-b from-indigo-900/20 to-slate-900 border border-indigo-500/30 rounded-xl p-4">
+            <h4 className="text-indigo-300 font-bold text-sm mb-2">Pro Insight</h4>
+            <p className="text-xs text-indigo-200/70 mb-3">
+                Trend Alert: "In-vivo Imaging" combined with "AI/ML" has seen a 40% uptick in BioRxiv this month.
+            </p>
+            <div className="h-1 w-full bg-indigo-900/50 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-500 w-3/4"></div>
+            </div>
+        </div>
+      )}
 
     </aside>
   );

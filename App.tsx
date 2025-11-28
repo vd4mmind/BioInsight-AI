@@ -9,7 +9,7 @@ import { PaperData, DiseaseTopic, StudyType, Methodology, PublicationType } from
 import { INITIAL_PAPERS, APP_NAME, APP_VERSION } from './constants';
 import { fetchLiteratureAnalysis } from './services/geminiService';
 import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Cell } from 'recharts';
-import { RefreshCw, BookOpen, Activity, FlaskConical, Database, History, Radio, Sparkles, FileText, ArrowDownUp, FilterX, Bookmark } from 'lucide-react';
+import { RefreshCw, BookOpen, Activity, FlaskConical, Database, History, Radio, Sparkles, FileText, ArrowDownUp, FilterX, Bookmark, ServerCog } from 'lucide-react';
 
 const App: React.FC = () => {
   // --- STATE ---
@@ -44,6 +44,7 @@ const App: React.FC = () => {
   // UI State
   const [activeTab, setActiveTab] = useState<'archive' | 'live' | 'bookmarks'>('archive');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [scanStatus, setScanStatus] = useState<string>("");
   const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(true); // Changed to true for auto-open
   const [sortBy, setSortBy] = useState<'date' | 'relevance'>('date');
@@ -70,17 +71,20 @@ const App: React.FC = () => {
 
   const filteredPapers = useMemo(() => {
     const filtered = currentPapers.filter(paper => {
-      // 1. Topic Match
+      // 1. Topic Match (Always Active)
+      // We respect user topic selection even in live mode to keep the feed relevant.
       const topicMatch = activeTopics.includes(paper.topic);
       
-      // 2. Study Type Match
-      const studyTypeMatch = activeStudyTypes.includes(paper.studyType);
+      // 2. Study Type Match (Bypassed in Live Mode)
+      // In Live Mode, we show ALL study types returned by the agents (RSS-like).
+      // The Sidebar inputs are visually disabled to indicate this.
+      const studyTypeMatch = activeTab === 'live' ? true : activeStudyTypes.includes(paper.studyType);
       
-      // 3. Methodology Match
-      const methodologyMatch = activeMethodologies.includes(paper.methodology);
+      // 3. Methodology Match (Bypassed in Live Mode)
+      const methodologyMatch = activeTab === 'live' ? true : activeMethodologies.includes(paper.methodology);
       
       // 4. Date/Era Logic
-      // CRITICAL UPDATE: If activeTab is 'live' or 'bookmarks', we IGNORE the eraFilter to ensure users see their content.
+      // If activeTab is 'live' or 'bookmarks', we IGNORE the eraFilter.
       let dateMatch = true;
       if (activeTab === 'archive') {
           const paperYear = new Date(paper.date).getFullYear();
@@ -118,7 +122,12 @@ const App: React.FC = () => {
         trials: filteredPapers.filter(p => p.studyType.includes('Trial')).length,
         aiMl: filteredPapers.filter(p => p.methodology.includes('AI/ML')).length,
         preprints: filteredPapers.filter(p => p.publicationType === PublicationType.Preprint).length,
-        peerReviewed: filteredPapers.filter(p => p.publicationType === PublicationType.PeerReviewed).length,
+        // Update: Group Reviews and Meta-Analyses with Peer Reviewed for stats
+        peerReviewed: filteredPapers.filter(p => 
+            p.publicationType === PublicationType.PeerReviewed || 
+            p.publicationType === PublicationType.ReviewArticle ||
+            p.publicationType === PublicationType.MetaAnalysis
+        ).length,
     };
   }, [filteredPapers]);
 
@@ -163,66 +172,39 @@ const App: React.FC = () => {
 
   const handleLiveRefresh = async () => {
     setIsLoading(true);
-    setActiveTab('live'); // Switch to live tab
-    
-    // Simulate "Checking sources..." delay for UX
-    await new Promise(r => setTimeout(r, 800));
+    setActiveTab('live'); 
+    setScanStatus("Initializing parallel agents...");
 
     // INTELLIGENCE TRACKER LOGIC:
+    // We only pass activeTopics. The service will scan for these topics without methodology constraints
+    // to function as a true "RSS" reader.
     const searchTopics = activeTopics;
-    const searchStudyTypes = activeStudyTypes;
-    const searchMethodologies = activeMethodologies;
 
-    const newPapers = await fetchLiteratureAnalysis([], searchTopics, searchStudyTypes, searchMethodologies);
+    setTimeout(() => setScanStatus("Scanning BioRxiv & MedRxiv..."), 800);
+    setTimeout(() => setScanStatus("Scanning Major Journals (Nature, NEJM)..."), 2000);
+
+    // Call the updated service
+    const newPapers = await fetchLiteratureAnalysis(searchTopics);
     
+    setScanStatus("Synthesizing results...");
+
     if (newPapers.length > 0) {
         setLivePapers(prev => {
-            // Normalizer that preserves spaces for accurate word/phrase boundary detection
-            const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+            // Deduplicate against existing live papers logic in App
+            const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-            const newUnique = newPapers.filter(np => {
-                const npTitle = normalize(np.title);
-                const npAuthor = np.authors.length > 0 ? normalize(np.authors[0]) : '';
-
-                // Check against existing papers
-                const isDuplicate = prev.some(op => {
-                    const opTitle = normalize(op.title);
-                    const opAuthor = op.authors.length > 0 ? normalize(op.authors[0]) : '';
-
-                    // Title Checks
-                    const isExactTitle = opTitle === npTitle;
-                    // Fuzzy title: strict substring match only if titles are substantial (>20 chars)
-                    const isFuzzyTitle = opTitle.length > 20 && npTitle.length > 20 && 
-                                        (opTitle.includes(npTitle) || npTitle.includes(opTitle));
-
-                    // Author Checks
-                    const isAuthorMatch = (opAuthor && npAuthor && (opAuthor.includes(npAuthor) || npAuthor.includes(opAuthor)));
-                    const isAuthorMissing = !opAuthor || !npAuthor;
-
-                    // DEDUPLICATION RULES:
-                    
-                    // 1. Exact Title Match:
-                    // Consider duplicate if authors also match OR if one paper is missing author info (safety against lazy citations)
-                    if (isExactTitle) {
-                        return isAuthorMatch || isAuthorMissing;
-                    }
-
-                    // 2. Fuzzy Title Match (Near Duplicate):
-                    // ONLY consider duplicate if Author ALSO matches. 
-                    // This prevents "Effect of X on Y" and "Effect of X on Z" being conflated unless same author.
-                    if (isFuzzyTitle && isAuthorMatch) {
-                        return true;
-                    }
-
-                    return false;
-                });
-                
-                return !isDuplicate;
+            // Only filter out papers that ALREADY exist in the feed
+            const completelyNew = newPapers.filter(np => {
+                const npFingerprint = normalize(np.title);
+                const isAlreadyListed = prev.some(op => normalize(op.title) === npFingerprint);
+                return !isAlreadyListed;
             });
-            return [...newUnique, ...prev];
+            
+            return [...completelyNew, ...prev];
         });
         setLastLiveUpdate(new Date());
     }
+    setScanStatus("");
     setIsLoading(false);
   };
 
@@ -353,8 +335,12 @@ const App: React.FC = () => {
                         disabled={isLoading}
                         className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 hover:border-blue-500 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-all"
                     >
-                        <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
-                        {activeTab === 'live' ? 'Fetch Latest' : 'Switch to Live'}
+                        {isLoading ? (
+                            <ServerCog className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
+                        ) : (
+                            <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+                        )}
+                        {isLoading ? scanStatus || 'Scanning...' : (activeTab === 'live' ? 'Fetch Latest' : 'Switch to Live')}
                     </button>
                 </div>
              </div>
@@ -395,13 +381,13 @@ const App: React.FC = () => {
                         <Radio className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                         <h3 className="text-lg font-bold text-slate-200">Live Intelligence Standby</h3>
                         <p className="text-slate-400 mt-2 max-w-sm mx-auto mb-4">
-                            System is ready to scan for recent papers, posters, and abstracts based on your selected filters.
+                            System is ready to scan parallel channels (Preprints & Journals) for recent papers based on your selected topics.
                         </p>
                         <button 
                             onClick={handleLiveRefresh}
                             className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors"
                         >
-                            <Sparkles className="w-4 h-4" /> Start Discovery Scan
+                            <Sparkles className="w-4 h-4" /> Start Multi-Channel Scan
                         </button>
                     </div>
                 )}
@@ -436,8 +422,6 @@ const App: React.FC = () => {
                             <p className="text-xs font-bold text-slate-400 uppercase">How to improve search:</p>
                             <ul className="text-xs text-slate-400 list-disc list-inside space-y-1">
                                 {activeTopics.length < 3 && <li>Select more <strong>Disease Topics</strong> in the sidebar.</li>}
-                                {activeMethodologies.length < 3 && <li>Broaden <strong>Methodology</strong> (try enabling AI/ML).</li>}
-                                {activeStudyTypes.length < 2 && <li>Include <strong>Pre-clinical</strong> or <strong>Simulated</strong> studies.</li>}
                                 {activeTab === 'archive' && <li>Switch <strong>Timeline</strong> to "Since 2010" (Archive only).</li>}
                             </ul>
                             <button 
@@ -476,7 +460,7 @@ const App: React.FC = () => {
                 <p className="text-[10px] text-slate-500 max-w-xl mx-auto leading-relaxed">
                     <strong>DUAL MODE SYSTEM:</strong> <br/>
                     1. <strong>Archive:</strong> Curated list of verified landmark papers (2010-Present).<br/>
-                    2. <strong>Live Feed:</strong> Real-time AI agent using Google Search Grounding to find papers from the last 30 days.
+                    2. <strong>Live Feed:</strong> Multi-Channel Swarm Intelligence scanning major journals and preprints for the last 30 days.
                 </p>
             </div>
         </div>
