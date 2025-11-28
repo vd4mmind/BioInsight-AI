@@ -100,14 +100,35 @@ export const fetchLiteratureAnalysis = async (
       }
     `;
 
-    const discoveryResponse = await ai.models.generateContent({
-      model: modelId,
-      contents: discoveryPrompt,
-      config: {
-        temperature: 0.3, 
-        tools: [{ googleSearch: {} }], 
+    let discoveryResponse;
+    
+    // ATTEMPT 1: Try with Search Grounding
+    try {
+      discoveryResponse = await ai.models.generateContent({
+        model: modelId,
+        contents: discoveryPrompt,
+        config: {
+          temperature: 0.3, 
+          tools: [{ googleSearch: {} }], 
+        }
+      });
+    } catch (e) {
+      console.warn("Search Grounding failed (likely 500/XHR error). Retrying without tools.", e);
+      // ATTEMPT 2: Fallback to basic generation without tools
+      try {
+        discoveryResponse = await ai.models.generateContent({
+          model: modelId,
+          contents: discoveryPrompt,
+          config: {
+            temperature: 0.3,
+            // No tools
+          }
+        });
+      } catch (retryError) {
+        console.error("Fallback generation also failed.", retryError);
+        throw retryError;
       }
-    });
+    }
 
     const textResponse = discoveryResponse.text || "";
     const rawData = parseJSON(textResponse);
@@ -123,6 +144,7 @@ export const fetchLiteratureAnalysis = async (
         let finalTitle = paper.title; 
         let isSearchFallback = false;
 
+        // Check if we have grounding chunks (only available if Attempt 1 succeeded)
         const chunks = discoveryResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
         
         // --- STRICT GROUNDING SYNC LOGIC ---

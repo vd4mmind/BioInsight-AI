@@ -9,7 +9,7 @@ import { PaperData, DiseaseTopic, StudyType, Methodology, PublicationType } from
 import { INITIAL_PAPERS, APP_NAME, APP_VERSION } from './constants';
 import { fetchLiteratureAnalysis } from './services/geminiService';
 import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Cell } from 'recharts';
-import { RefreshCw, BookOpen, Activity, FlaskConical, Database, History, Radio, Sparkles, FileText, ArrowDownUp, FilterX } from 'lucide-react';
+import { RefreshCw, BookOpen, Activity, FlaskConical, Database, History, Radio, Sparkles, FileText, ArrowDownUp, FilterX, Bookmark } from 'lucide-react';
 
 const App: React.FC = () => {
   // --- STATE ---
@@ -18,9 +18,20 @@ const App: React.FC = () => {
   
   // Live Data (Fetched from API)
   const [livePapers, setLivePapers] = useState<PaperData[]>([]);
+
+  // Bookmarked Data (Persisted)
+  const [savedPapers, setSavedPapers] = useState<PaperData[]>(() => {
+    try {
+      const saved = localStorage.getItem('bioinsight_bookmarks');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("Failed to load bookmarks", e);
+      return [];
+    }
+  });
   
   // UI State
-  const [activeTab, setActiveTab] = useState<'archive' | 'live'>('archive');
+  const [activeTab, setActiveTab] = useState<'archive' | 'live' | 'bookmarks'>('archive');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(true); // Changed to true for auto-open
@@ -32,8 +43,15 @@ const App: React.FC = () => {
   const [activeMethodologies, setActiveMethodologies] = useState<Methodology[]>(Object.values(Methodology));
   const [eraFilter, setEraFilter] = useState<'all' | '5years' | '1year'>('all');
 
+  // --- PERSISTENCE EFFECT ---
+  useEffect(() => {
+    localStorage.setItem('bioinsight_bookmarks', JSON.stringify(savedPapers));
+  }, [savedPapers]);
+
   // --- FILTERING LOGIC ---
-  const currentPapers = activeTab === 'archive' ? archivePapers : livePapers;
+  const currentPapers = activeTab === 'archive' ? archivePapers : 
+                        activeTab === 'live' ? livePapers : 
+                        savedPapers;
 
   const filteredPapers = useMemo(() => {
     const filtered = currentPapers.filter(paper => {
@@ -47,8 +65,7 @@ const App: React.FC = () => {
       const methodologyMatch = activeMethodologies.includes(paper.methodology);
       
       // 4. Date/Era Logic
-      // CRITICAL UPDATE: If activeTab is 'live', we IGNORE the eraFilter.
-      // Live papers are always "current".
+      // CRITICAL UPDATE: If activeTab is 'live' or 'bookmarks', we IGNORE the eraFilter to ensure users see their content.
       let dateMatch = true;
       if (activeTab === 'archive') {
           const paperYear = new Date(paper.date).getFullYear();
@@ -95,6 +112,20 @@ const App: React.FC = () => {
   const COLORS = ['#60A5FA', '#34D399', '#818CF8', '#F472B6', '#FBBF24', '#A78BFA', '#F87171'];
 
   // --- HANDLERS ---
+  const handleToggleBookmark = (paper: PaperData) => {
+    setSavedPapers(prev => {
+        // Check by ID or fallback to Title+Author for robust matching across live re-fetches
+        const exists = prev.some(p => p.id === paper.id || (p.title === paper.title && p.authors?.[0] === paper.authors?.[0]));
+        if (exists) {
+            // Remove
+            return prev.filter(p => !(p.id === paper.id || (p.title === paper.title && p.authors?.[0] === paper.authors?.[0])));
+        } else {
+            // Add (ensure we save a clean copy)
+            return [paper, ...prev];
+        }
+    });
+  };
+
   const handleLiveRefresh = async () => {
     setIsLoading(true);
     setActiveTab('live'); // Switch to live tab
@@ -188,7 +219,7 @@ const App: React.FC = () => {
                 label="Active Papers" 
                 value={stats.total} 
                 icon={<Database className="w-5 h-5 text-blue-400" />}
-                trend={activeTab === 'live' ? "Live View" : "Archive"}
+                trend={activeTab === 'live' ? "Live View" : activeTab === 'bookmarks' ? "Saved" : "Archive"}
             />
             <StatCard 
                 label="Peer Reviewed" 
@@ -255,6 +286,14 @@ const App: React.FC = () => {
                         {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Radio className="w-4 h-4" />}
                         Live Feed
                     </button>
+                    <button 
+                        onClick={() => setActiveTab('bookmarks')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'bookmarks' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                        <Bookmark className="w-4 h-4" />
+                        Bookmarks
+                        <span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-900/30 text-[10px]">{savedPapers.length}</span>
+                    </button>
                 </div>
 
                 <div className="flex items-center gap-2 w-full md:w-auto">
@@ -289,7 +328,7 @@ const App: React.FC = () => {
              {filteredPapers.length > 0 && (
                 <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 mb-6">
                     <h3 className="text-sm font-bold text-slate-300 mb-4 uppercase tracking-wider">
-                        {activeTab === 'archive' ? 'Historical Topic Distribution' : 'Live Trend Distribution'}
+                        {activeTab === 'archive' ? 'Historical Topic Distribution' : activeTab === 'bookmarks' ? 'Saved Papers Distribution' : 'Live Trend Distribution'}
                     </h3>
                     <div className="h-32 w-full">
                         <ResponsiveContainer width="100%" height="100%">
@@ -331,9 +370,26 @@ const App: React.FC = () => {
                         </button>
                     </div>
                 )}
+
+                {/* Empty Bookmarks State */}
+                {activeTab === 'bookmarks' && savedPapers.length === 0 ? (
+                     <div className="text-center py-12 border border-slate-700 rounded-xl bg-slate-800/50">
+                        <Bookmark className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                        <h4 className="text-slate-300 font-bold">No Bookmarks Yet</h4>
+                        <p className="text-xs text-slate-500 mt-1 mb-4">
+                           Save papers from the Archive or Live Feed to access them here.
+                        </p>
+                        <button 
+                            onClick={() => setActiveTab('archive')}
+                            className="mt-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 rounded text-xs font-semibold transition-colors"
+                        >
+                            Browse Archive
+                        </button>
+                     </div>
+                ) : 
                 
-                {/* Empty Filter State (Loaded but filtered to 0) */}
-                {filteredPapers.length === 0 && (activeTab === 'archive' || (activeTab === 'live' && livePapers.length > 0)) ? (
+                /* Empty Filter State (Loaded but filtered to 0) */
+                filteredPapers.length === 0 && (activeTab !== 'live' || livePapers.length > 0) ? (
                      <div className="text-center py-12 border border-slate-700 rounded-xl bg-slate-800/50">
                         <FilterX className="w-10 h-10 text-slate-500 mx-auto mb-3" />
                         <h4 className="text-slate-300 font-bold">No Results Found</h4>
@@ -359,7 +415,12 @@ const App: React.FC = () => {
                      </div>
                 ) : (
                     filteredPapers.map(paper => (
-                        <PaperCard key={paper.id} paper={paper} />
+                        <PaperCard 
+                            key={paper.id} 
+                            paper={paper} 
+                            isBookmarked={savedPapers.some(p => p.id === paper.id || (p.title === paper.title && p.authors?.[0] === paper.authors?.[0]))}
+                            onToggleBookmark={() => handleToggleBookmark(paper)}
+                        />
                     ))
                 )}
              </div>

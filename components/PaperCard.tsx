@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { PaperData, PublicationType, StudyType, Methodology, ResearchModality } from '../types';
-import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Activity, Biohazard, Newspaper, Radio, Sparkles, Search } from 'lucide-react';
+import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, Microscope, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Activity, Biohazard, Newspaper, Radio, Sparkles, Search, Bookmark } from 'lucide-react';
 
 interface PaperCardProps {
   paper: PaperData;
+  isBookmarked: boolean;
+  onToggleBookmark: () => void;
 }
 
-export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
+export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onToggleBookmark }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   
@@ -255,6 +257,19 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper }) => {
 
         {/* Side Stats / Validation */}
         <div className="flex flex-row md:flex-col gap-3 md:w-32 shrink-0 items-center md:items-end border-t md:border-t-0 border-slate-700/50 pt-3 md:pt-0 w-full md:h-full justify-between md:justify-start">
+            
+            {/* Bookmark Button */}
+            <button 
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleBookmark();
+                }}
+                className={`p-2 rounded-lg transition-colors ${isBookmarked ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-200'}`}
+                title={isBookmarked ? "Remove from bookmarks" : "Save for later"}
+            >
+                <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+            </button>
+
             <div className={`flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 ${getValidationColor(paper.validationScore)}`}>
                 <span className="text-lg font-bold">{paper.validationScore}</span>
                 <span className="text-[8px] uppercase font-bold">Score</span>
