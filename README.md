@@ -20,15 +20,22 @@ It features a dual-mode architecture:
 1.  **Archive Mode**: A curated, validated library of landmark clinical trials and papers (2010–Present).
 2.  **Live Intelligence Feed**: A real-time, multi-agent system that aggregates, verifies, and classifies research from the last 30 days.
 
-## 🧠 Core Architecture: Multi-Agent Swarm
+## 🧠 Core Architecture: Hybrid Swarm
 
-BioInsight.AI utilizes a **Parallel Multi-Agent Swarm** architecture to ensure high-precision data retrieval without hallucinations.
+BioInsight.AI utilizes a **Hybrid Swarm Architecture** that combines high-precision targeting with broad semantic search.
 
 ### 1. The Swarm
-Instead of a single search query, the system dispatches three specialized AI agents simultaneously:
-*   **🕵️ Preprint Hunter**: Exclusively scans `biorxiv.org` and `medrxiv.org` for rapid, unreviewed scientific data.
-*   **🦅 Journal Scout**: Monitors high-impact domains including *Nature, NEJM, The Lancet, Cell, and Science*.
-*   **🌐 Broad Aggregator**: Scans trusted aggregators like PubMed and academic databases for broader coverage.
+Instead of a single search query, the system dispatches 5 specialized AI agents simultaneously:
+
+#### Pipeline A: The Snipers (Precision)
+These agents use strict `site:` and `after:` operators to force the search engine to retrieve recent content from specific high-tier domains.
+*   **🦅 Sniper-General**: Targets *Nature, Science, Cell, PNAS*.
+*   **🏥 Sniper-Clinical**: Targets *NEJM, The Lancet, JAMA, BMJ*.
+*   **🔬 Sniper-Specialty**: Targets *AHA Journals, Diabetes Journals, EMBO*.
+*   **🕵️ Sniper-Preprint**: Targets *BioRxiv, MedRxiv*.
+
+#### Pipeline B: The Trawler (Breadth)
+*   **🌐 Trawler-Semantic**: Uses natural language ("latest research papers...") to catch relevant studies from broader sources that the Snipers might miss, leveraging Google's semantic understanding.
 
 ### 2. Strict Grounding (Zero Hallucination Policy)
 The platform enforces a "Grounding-First" verification layer.

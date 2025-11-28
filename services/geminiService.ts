@@ -2,49 +2,14 @@ import { GoogleGenAI } from "@google/genai";
 import { PaperData, DiseaseTopic, Methodology, StudyType, ResearchModality, PublicationType } from "../types";
 
 // Initialize Gemini Client
-// The API key is obtained from the environment variable as per strict guidelines.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-// --- AGENT CONFIGURATIONS ---
-
-interface AgentConfig {
-    name: string;
-    role: string;
-    sources: string[];
-    baseInstruction: string;
-}
-
-const AGENTS: Record<string, AgentConfig> = {
-    PREPRINT: {
-        name: "Preprint Hunter",
-        role: "Scanner for latest unreviewed manuscripts",
-        sources: ["biorxiv.org", "medrxiv.org"],
-        baseInstruction: "Focus on finding the absolute latest manuscripts. Classify widely."
-    },
-    JOURNAL: {
-        name: "Journal Scout",
-        role: "Scanner for high-impact peer-reviewed publications",
-        sources: [
-            "nature.com", "nejm.org", "thelancet.com", "cell.com", "science.org", 
-            "jamanetwork.com", "ahajournals.org", "diabetesjournals.org", 
-            "bmj.com", "embo.org", "sciencedirect.com"
-        ],
-        baseInstruction: "Focus on major studies, clinical trials, and reviews."
-    },
-    BROAD: {
-        name: "Broad Aggregator",
-        role: "Scanner for broad coverage via aggregators",
-        sources: ["pubmed.ncbi.nlm.nih.gov", "academic.oup.com", "wiley.com"],
-        baseInstruction: "Focus on abstracts and broad topic coverage."
-    }
-};
 
 // --- HELPER FUNCTIONS ---
 
 // 1. Clean Title (Deterministic)
 const cleanWebTitle = (title: string): string => {
     if (!title) return "";
-    // Remove common SEO suffixes to leave just the academic title
+    // Remove common SEO suffixes
     let cleaned = title.split(' | ')[0]; 
     cleaned = cleaned.split(' - ')[0];  
     
@@ -72,8 +37,7 @@ async function generateContentWithRetry(modelId: string, params: any, retries = 
             });
         } catch (error: any) {
             console.warn(`Attempt ${i + 1} failed: ${error.message}`);
-            if (i === retries) throw error; // Rethrow on last fail
-            // Exponential backoff
+            if (i === retries) throw error;
             await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
         }
     }
@@ -86,7 +50,6 @@ const parseJSON = (text: string): any[] => {
         const match = text.match(jsonBlockRegex);
         if (match) return JSON.parse(match[1]);
         
-        // Fallback: Try to find the first '[' and last ']'
         const start = text.indexOf('[');
         const end = text.lastIndexOf(']');
         if (start !== -1 && end !== -1) {
@@ -98,128 +61,107 @@ const parseJSON = (text: string): any[] => {
     return [];
 };
 
-// --- CORE AGENT FUNCTION ---
+// --- CORE HYBRID AGENT FUNCTION ---
 
-const runAgent = async (
-    agentKey: string, 
-    activeTopics: string[], 
-    dateString: string
+const runHybridAgent = async (
+    agentName: string, 
+    searchQuery: string, 
+    cutoffDate: Date
 ): Promise<PaperData[]> => {
-    const agent = AGENTS[agentKey];
-    const modelId = "gemini-2.5-flash"; // Use the latest model for reasoning
+    const modelId = "gemini-2.5-flash"; 
 
-    // 1. Construct Search Query (Topic + Site ONLY)
-    // We intentionally DO NOT include Methodologies here to ensure we get broad hits (RSS-like).
-    // We use "site:" operators to restrict to high-quality domains.
-    const topicQuery = activeTopics.length > 0 
-        ? `("${activeTopics.join('" OR "')}")`
-        : '(CVD OR Diabetes OR Obesity OR "Chronic Kidney Disease")';
-    
-    const siteQuery = agent.sources.map(s => `site:${s}`).join(' OR ');
-    
-    // We remove strict "after:" operators to prevent search failures. 
-    // Filtering happens in the verification step.
-    const searchQuery = `${topicQuery} (${siteQuery})`;
-
-    // 2. Construct Prompt (Extraction & Classification)
+    // System Prompt: Focus on Extraction & Classification
     const systemPrompt = `
-        You are the ${agent.name}. Your goal is to find scientific literature.
+        You are the ${agentName}. Your goal is to find scientific literature based on the executed search.
         
         **INSTRUCTIONS:**
         1.  Use the 'googleSearch' tool to execute this exact query: \`${searchQuery}\`
-        2.  From the search results, IDENTIFY papers/abstracts/articles.
-        3.  **CRITICAL:** You must output a JSON array. For each paper found, you must map it to the schema below.
-        4.  **VERIFICATION:** The 'url' field in your JSON MUST match one of the search result links exactly.
-        5.  **CLASSIFICATION:** Read the title/snippet and infer the 'studyType', 'methodology', and 'topic'.
-            - If it mentions "AI", "Machine Learning", "Deep Learning", set methodology to "AI/ML".
-            - If it mentions "Trial", "RCT", "Randomized", set studyType to "Clinical Trial".
-            - If it is from BioRxiv/MedRxiv, set publicationType to "Preprint".
+        2.  From the search results, IDENTIFY scientific papers, clinical trials, or preprints.
+        3.  **STRICT JSON OUTPUT:** Map findings to the schema below.
+        4.  **VERIFICATION:** The 'url' field MUST match one of the search result links exactly.
+        5.  **CLASSIFICATION:** Infer 'studyType', 'methodology', and 'topic' from the title/abstract.
+            - "AI", "Machine Learning" -> methodology: "AI/ML"
+            - "Trial", "RCT" -> studyType: "Clinical Trial"
+            - "Review" -> publicationType: "Review Article"
+            - BioRxiv/MedRxiv -> publicationType: "Preprint"
         
         **JSON SCHEMA:**
         [
           {
-            "url": "Exact URL from the search result",
-            "date": "YYYY-MM-DD (Best guess from snippet, or today's date if 'recent')",
+            "url": "Exact URL from search result",
+            "title": "Full academic title",
+            "date": "YYYY-MM-DD",
             "authors": ["Author 1", "et al"],
             "topic": "CVD | CKD | MASH | Diabetes | Obesity",
             "publicationType": "Preprint | Peer Reviewed | Review Article | Meta-Analysis | News/Analysis",
             "studyType": "Clinical Trial | Human Cohort | Pre-clinical | Simulated",
             "methodology": "AI/ML | Lab Experimental | Statistical",
             "modality": "Genetics | Proteomics | Imaging | Clinical Data | Other",
-            "abstractHighlight": "Brief 10-word summary of the finding",
-            "drugAndTarget": "Drug Name (Target) or N/A",
-            "context": "Why is this relevant? (Max 10 words)"
+            "abstractHighlight": "Brief 15-word summary",
+            "drugAndTarget": "Drug (Target) or N/A",
+            "context": "Why relevant? (Max 10 words)"
           }
         ]
     `;
 
     try {
-        // Execute Request
         const response = await generateContentWithRetry(modelId, {
             contents: systemPrompt,
             config: {
-                temperature: 0.1, // Low temp for extraction precision
+                temperature: 0.1, 
                 tools: [{ googleSearch: {} }]
             }
         });
 
-        // 3. Process Results (The "Grounding Handshake")
         const aiJson = parseJSON(response?.text || "");
         const groundingChunks = response?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
         
         if (aiJson.length === 0 || groundingChunks.length === 0) return [];
 
         const verifiedPapers: PaperData[] = [];
-        const thirtyDaysAgo = new Date(dateString).getTime();
+        const thirtyDaysAgoTime = cutoffDate.getTime();
 
-        // 4. Verification Loop
         for (const item of aiJson) {
-            // A. Find the Grounding Chunk that matches this Item (Source of Truth)
-            // We verify by URL matching primarily, falling back to Title containment
+            // A. Verification (Grounding Handshake)
+            // Priority: Exact URL match -> Title Containment
             const matchedChunk = groundingChunks.find((c: any) => 
                 (c.web?.uri && item.url && c.web.uri === item.url) || 
                 (c.web?.title && item.title && c.web.title.includes(item.title))
             );
 
-            // Strict Grounding Check: If no search hit backs this up, we skip it.
             if (!matchedChunk || !matchedChunk.web?.uri || !matchedChunk.web?.title) continue;
 
-            // B. Date Filter (Strict JS Check)
-            // We check the AI extracted date
+            // B. Date Filter (Strict)
             let itemDate = new Date(item.date);
-            
-            // Heuristic: If AI failed to extract date, check snippet for "2024" or "2025"
             if (isNaN(itemDate.getTime())) {
-                const snippet = (matchedChunk.web.title + " " + (item.abstractHighlight || ""));
-                const hasRecentYear = snippet.includes("2024") || snippet.includes("2025");
-                
-                if (!hasRecentYear) {
-                   continue; // Likely old junk
+                // If date parsing fails, strictly check year in title/snippet
+                const snippet = (matchedChunk.web.title + " " + (item.abstractHighlight || "")).toLowerCase();
+                if (snippet.includes("2024") || snippet.includes("2025")) {
+                    itemDate = new Date(); // Assume recent if year is present
+                } else {
+                    continue; 
                 }
-                itemDate = new Date(); // Treat as new if it passed the year check
             }
 
-            // Strict 30-day cutoff
-            if (itemDate.getTime() < thirtyDaysAgo) continue;
+            if (itemDate.getTime() < thirtyDaysAgoTime) continue;
 
-            // C. Construct the Paper Object
+            // C. Construct Object
             verifiedPapers.push({
                 id: `live-${Math.random().toString(36).substr(2, 9)}`,
-                title: cleanWebTitle(matchedChunk.web.title), // ALWAYS use the Web Title (No Hallucination)
-                url: matchedChunk.web.uri, // ALWAYS use the Web URL
+                title: cleanWebTitle(matchedChunk.web.title), // Source of Truth
+                url: matchedChunk.web.uri,
                 journalOrConference: new URL(matchedChunk.web.uri).hostname.replace('www.', ''),
                 date: itemDate.toISOString().split('T')[0],
-                authors: item.authors || ["Unknown Authors"],
-                // Use AI Classification for these fields:
-                topic: (item.topic in DiseaseTopic) ? item.topic : DiseaseTopic.CVD, // Default fallback
+                authors: item.authors || ["Unknown"],
+                topic: (item.topic in DiseaseTopic) ? item.topic : DiseaseTopic.CVD,
                 publicationType: (item.publicationType in PublicationType) ? item.publicationType : PublicationType.PeerReviewed,
                 studyType: (item.studyType in StudyType) ? item.studyType : StudyType.PreClinical,
                 methodology: (item.methodology in Methodology) ? item.methodology : Methodology.Statistical,
                 modality: (item.modality in ResearchModality) ? item.modality : ResearchModality.Other,
-                abstractHighlight: item.abstractHighlight || "No abstract available.",
+                abstractHighlight: item.abstractHighlight || "Summary unavailable.",
                 drugAndTarget: item.drugAndTarget || "N/A",
-                context: item.context || "New search result",
-                validationScore: 100, // It is grounded
+                context: item.context || "Live Feed Result",
+                validationScore: agentName.includes("Sniper") ? 100 : 90, // Snipers are authoritative
                 authorsVerified: false,
                 isLive: true
             });
@@ -228,7 +170,7 @@ const runAgent = async (
         return verifiedPapers;
 
     } catch (e) {
-        console.error(`Agent ${agent.name} failed:`, e);
+        console.error(`Hybrid Agent ${agentName} failed:`, e);
         return [];
     }
 };
@@ -239,35 +181,65 @@ export const fetchLiteratureAnalysis = async (
     activeTopics: string[]
 ): Promise<PaperData[]> => {
     
-    // 1. Calculate Cutoff
+    // 1. Calculate Strict Date Cutoff (30 Days)
     const today = new Date();
-    const pastDate = new Date();
-    pastDate.setDate(today.getDate() - 30);
-    const dateString = pastDate.toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const dateStr = thirtyDaysAgo.toISOString().split('T')[0];
 
-    console.log("Starting Multi-Agent Swarm...");
+    // 2. Prepare Query Strings
+    // If no topics selected, default to broad query
+    const topicStr = activeTopics.length > 0 
+        ? `("${activeTopics.join('" OR "')}")`
+        : '("CVD" OR "Diabetes" OR "Obesity" OR "NASH")';
+    
+    // For Trawler (Natural Language)
+    const trawlerTopicStr = activeTopics.length > 0 ? activeTopics.join(', ') : "Cardiovascular Disease, Metabolic Disorders";
 
-    // 2. Launch Agents in Parallel
-    // We launch all agents to ensure maximum coverage (Preprints + Journals + Broad)
+    console.log("Launching Hybrid Swarm (Sniper + Trawler)...");
+
+    // 3. Define Swarm Configuration
+    const swarmConfig = [
+        // --- PIPELINE A: SNIPER AGENTS (Precision + Prestige) ---
+        // Break journals into tiers to avoid query timeouts.
+        {
+            name: "Sniper-General",
+            query: `(site:nature.com OR site:science.org OR site:cell.com OR site:pnas.org) ${topicStr} after:${dateStr}`
+        },
+        {
+            name: "Sniper-Clinical",
+            query: `(site:nejm.org OR site:thelancet.com OR site:jamanetwork.com OR site:bmj.com) ${topicStr} after:${dateStr}`
+        },
+        {
+            name: "Sniper-Specialty",
+            query: `(site:ahajournals.org OR site:diabetesjournals.org OR site:embo.org) ${topicStr} after:${dateStr}`
+        },
+        {
+            name: "Sniper-Preprint",
+            query: `(site:biorxiv.org OR site:medrxiv.org) ${topicStr} after:${dateStr}`
+        },
+        // --- PIPELINE B: TRAWLER AGENT (Semantic + Broad) ---
+        // Catches papers from other sources using natural language intent.
+        {
+            name: "Trawler-Semantic",
+            query: `latest research papers study ${trawlerTopicStr} published after ${dateStr} -news -blog`
+        }
+    ];
+
+    // 4. Parallel Execution
     try {
-        const results = await Promise.all([
-            runAgent("PREPRINT", activeTopics, dateString),
-            runAgent("JOURNAL", activeTopics, dateString),
-            runAgent("BROAD", activeTopics, dateString)
-        ]);
+        const results = await Promise.all(
+            swarmConfig.map(agent => runHybridAgent(agent.name, agent.query, thirtyDaysAgo))
+        );
 
-        // 3. Flatten Results
-        let allPapers = results.flat();
-
-        // 4. Deduplicate (Strict URL & Title Fingerprint)
+        // 5. Synthesis & Deduplication
+        const allPapers = results.flat();
         const seen = new Set<string>();
         const uniquePapers: PaperData[] = [];
 
+        // Prioritize Sniper results (first in array) during dedupe
         for (const p of allPapers) {
-            // Fingerprint: hostname + first 15 chars of title (normalized)
-            // This catches the same paper from different agents
-            const normalize = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '');
-            const fingerprint = normalize(p.title).substring(0, 20);
+            // Fingerprint: 1st 20 chars of normalized title
+            const fingerprint = p.title.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 20);
             
             if (!seen.has(fingerprint)) {
                 seen.add(fingerprint);
@@ -275,11 +247,12 @@ export const fetchLiteratureAnalysis = async (
             }
         }
 
-        // 5. Sort by Date Descending
+        // 6. Sort by Date (Newest First)
+        // If dates are equal, Sniper results (score 100) will float to top naturally via stable sort or we can force it.
         return uniquePapers.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     } catch (e) {
-        console.error("Swarm failed:", e);
+        console.error("Hybrid Swarm failed:", e);
         return [];
     }
 };
