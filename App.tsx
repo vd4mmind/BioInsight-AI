@@ -408,9 +408,18 @@ const App: React.FC = () => {
                         </p>
                         <button 
                             onClick={handleLiveRefresh}
-                            className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors"
+                            disabled={cooldown > 0}
+                            className={`inline-flex items-center gap-2 px-6 py-2 rounded-lg font-semibold transition-colors ${
+                                cooldown > 0 
+                                ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600' 
+                                : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20'
+                            }`}
                         >
-                            <Sparkles className="w-4 h-4" /> Start Multi-Channel Scan
+                            {cooldown > 0 ? (
+                                <> <Timer className="w-4 h-4 text-orange-400" /> System Cooling Down ({cooldown}s) </>
+                            ) : (
+                                <> <Sparkles className="w-4 h-4" /> Start Multi-Channel Scan </>
+                            )}
                         </button>
                     </div>
                 )}
