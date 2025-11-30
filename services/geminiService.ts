@@ -188,7 +188,7 @@ const runHybridAgent = async (
                 abstractHighlight: item.abstractHighlight || "Summary unavailable.",
                 drugAndTarget: item.drugAndTarget || "N/A",
                 context: item.context || "Live Feed Result",
-                validationScore: agentName.includes("Academic") ? 100 : 90, 
+                validationScore: agentName.includes("Hub") ? 100 : 90, 
                 authorsVerified: false,
                 isLive: true,
                 isPolished: false
@@ -245,19 +245,24 @@ export async function* fetchLiteratureAnalysisStream(activeTopics: string[]): As
     const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
     const dateStr = thirtyDaysAgo.toISOString().split('T')[0];
 
-    // 2. Optimized Swarm Config (Consolidated Agents)
+    // 2. Optimized Hub & Spoke Config
     const topicStr = activeTopics.slice(0, 3).map(t => TOPIC_EXPANSION[t] || `"${t}"`).join(' OR ');
     
-    // Agent 1: The "Big 4" + Clinical Majors + Specialty High-Impact
-    // Added: cell.com (Obesity/MASH), kidney-international.org (CKD), gastrojournal.org (Liver), aasldpubs (Hepatology)
-    const academicQuery = `(site:nature.com OR site:science.org OR site:nejm.org OR site:thelancet.com OR site:jamanetwork.com OR site:ahajournals.org OR site:diabetesjournals.org OR site:cell.com OR site:kidney-international.org OR site:gastrojournal.org OR site:journal-of-hepatology.eu OR site:aasldpubs.onlinelibrary.wiley.com) ${topicStr} after:${dateStr}`;
+    // Agent 1: The "Hub & Spoke" Model - High Precision
+    // Includes "Big 4" + Specialty Societies + Major Publisher Hubs (Elsevier, Oxford, Springer, Wiley)
+    // - academic.oup.com covers JASN, CJASN, Kidney360, EHJ
+    // - sciencedirect.com covers JACC, AJKD, Cell, Lancet family, Gastro
+    // - link.springer.com covers Diabetologia
+    // - onlinelibrary.wiley.com covers Hepatology (AASLD)
+    const academicQuery = `(site:nature.com OR site:science.org OR site:nejm.org OR site:thelancet.com OR site:jamanetwork.com OR site:ahajournals.org OR site:diabetesjournals.org OR site:cell.com OR site:academic.oup.com OR site:sciencedirect.com OR site:link.springer.com OR site:onlinelibrary.wiley.com) ${topicStr} after:${dateStr}`;
     
-    // Agent 2: Preprints & Broader Web (Consolidated)
-    const preprintQuery = `(site:biorxiv.org OR site:medrxiv.org OR "clinical trial results" OR "new mechanism of action") ${topicStr} after:${dateStr} -news`;
+    // Agent 2: The Safety Net (PubMed) + Preprints - High Recall
+    // Captures anything missed by Agent 1 or published in smaller journals.
+    const dragnetQuery = `(site:pubmed.ncbi.nlm.nih.gov OR site:biorxiv.org OR site:medrxiv.org) ${topicStr} after:${dateStr} -news`;
 
     const swarmConfig = [
-        { name: "Academic Swarm", query: academicQuery },
-        { name: "Preprint & Web Swarm", query: preprintQuery }
+        { name: "Publisher Hub Swarm", query: academicQuery },
+        { name: "PubMed & Preprint Dragnet", query: dragnetQuery }
     ];
 
     let allCollectedPapers: PaperData[] = [];

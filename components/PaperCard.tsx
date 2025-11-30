@@ -106,8 +106,13 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
       containerClasses += ` border-l-slate-600 border-slate-700`;
   }
 
-  // Check if current URL is likely a hub/TOC to suggest improvement
-  const isLikelyHub = currentUrl && (currentUrl.includes('/toc/') || currentUrl.includes('/issue/') || currentUrl.includes('/volume/'));
+  // Check if current URL is likely a hub/TOC/PubMed to suggest improvement
+  const isLikelyHub = currentUrl && (
+      currentUrl.includes('/toc/') || 
+      currentUrl.includes('/issue/') || 
+      currentUrl.includes('/volume/') || 
+      currentUrl.includes('pubmed.ncbi.nlm.nih.gov')
+  );
 
   return (
     <div className={containerClasses}>
@@ -343,13 +348,13 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
                             {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Link2 className="w-3.5 h-3.5 group-hover/btn:text-green-400" />}
                         </button>
                         
-                        {/* Find Better Link Button (Only if hub or unpolished) */}
-                        {isLive && !linkPolished && (
+                        {/* Find Better Link Button (Only if hub or unpolished or PubMed) */}
+                        {isLive && (!linkPolished || isLikelyHub) && (
                             <button
                                 onClick={handleImproveLink}
                                 disabled={isPolishing}
-                                className={`p-1 rounded text-slate-500 hover:text-yellow-400 transition-colors ${isPolishing ? 'animate-spin text-yellow-500' : ''}`}
-                                title="Find Direct PDF Link"
+                                className={`p-1 rounded text-slate-500 hover:text-yellow-400 transition-colors ${isPolishing ? 'animate-spin text-yellow-500' : isLikelyHub ? 'text-yellow-400/80 animate-pulse' : ''}`}
+                                title={isLikelyHub ? "Find Publisher Source" : "Find Direct PDF Link"}
                             >
                                 <FileSearch className="w-3.5 h-3.5" />
                             </button>

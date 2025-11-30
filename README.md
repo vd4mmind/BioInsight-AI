@@ -20,14 +20,14 @@ It features a dual-mode architecture:
 1.  **Archive Mode**: A curated, validated library of landmark clinical trials and papers (2010–Present).
 2.  **Live Intelligence Feed**: A real-time, multi-agent system that aggregates, verifies, and classifies research from the last 30 days.
 
-## 🧠 Core Architecture: Optimized Streaming Swarm (v2.0)
+## 🧠 Core Architecture: Hub & Spoke Swarm (v2.1)
 
-BioInsight.AI utilizes a **Hybrid Swarm Architecture** optimized for performance and resilience against API rate limits.
+BioInsight.AI utilizes a **Hybrid Swarm Architecture** optimized for high-recall performance and resilience against API rate limits.
 
-### 1. The Consolidated Swarm
-We have consolidated 5 specific agents into 2 high-density swarms to reduce network overhead:
-*   **Pipeline A: The Academic Swarm**: A massive Boolean query agent targeting the "Big 4" (Nature, Science, NEJM, Lancet) + Specialty Journals (AHA, Diabetes, JAMA) in a single pass.
-*   **Pipeline B: The Preprint & Web Swarm**: Scans BioRxiv, MedRxiv, and performs semantic trawling for broader web results.
+### 1. The Hub & Spoke Model
+To bypass query length limits while ensuring coverage of 1000+ specialty journals (e.g., *JASN*, *JACC*, *Hepatology*), we target "Publisher Hubs":
+*   **Swarm A: The Publisher Hubs (High Precision)**: Scans the "Big 4" (Nature, Science, NEJM, Lancet) PLUS major aggregator hubs: **Elsevier (ScienceDirect), Oxford Academic, Springer, and Wiley**.
+*   **Swarm B: The Dragnet (High Recall)**: Scans **PubMed** and Preprint servers (BioRxiv/MedRxiv) to catch anything missed by the main hubs.
 
 ### 2. "Cache-First, Ask-Later" Strategy
 *   **Smart Caching**: Every search result is hashed and stored locally with a 15-minute Time-To-Live (TTL).
@@ -38,8 +38,8 @@ We have consolidated 5 specific agents into 2 high-density swarms to reduce netw
 *   **Instant Feedback**: Papers are yielded to the dashboard as soon as the first agent returns, reducing perceived latency to <2 seconds.
 
 ### 4. On-Demand Enrichment (Lazy Loading)
-*   **Link Polishing**: To save resources, the system finds the generic URL first.
-*   **User Action**: Only when a user clicks **"Find Direct PDF"** does a specialized agent fire to hunt for the specific PDF/Full-Text link.
+*   **Link Polishing**: To save resources, the system finds the generic URL first (e.g., PubMed Abstract).
+*   **User Action**: If a user finds a PubMed link, a **pulsing yellow button** appears. Clicking "Find Publisher Source" triggers a specialized agent to hunt for the specific PDF/Full-Text link.
 
 ## ✨ Key Features
 
