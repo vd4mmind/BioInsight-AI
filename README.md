@@ -41,6 +41,30 @@ To bypass query length limits while ensuring coverage of 1000+ specialty journal
 *   **Link Polishing**: To save resources, the system finds the generic URL first (e.g., PubMed Abstract).
 *   **User Action**: If a user finds a PubMed link, a **pulsing yellow button** appears. Clicking "Find Publisher Source" triggers a specialized agent to hunt for the specific PDF/Full-Text link.
 
+## 📚 Active Source Watchlist
+
+BioInsight.AI scans over 1000+ journals through a strategic mix of direct domain targeting and publisher hubs.
+
+### Tier 1 & Societies (Direct Target)
+*   **Nature Portfolio**: `site:nature.com` (Nature, Nature Medicine, Nature Metabolism)
+*   **Science Family**: `site:science.org` (Science, Sci. Trans. Med.)
+*   **Medical Giants**: `site:nejm.org` (NEJM), `site:thelancet.com` (The Lancet Family), `site:jamanetwork.com` (JAMA Network)
+*   **Specialty Societies**: 
+    *   `site:ahajournals.org` (Circulation, Hypertension)
+    *   `site:diabetesjournals.org` (Diabetes Care)
+    *   `site:cell.com` (Cell, Cell Metabolism)
+
+### Publisher Hubs (Aggregators)
+Searching these hubs allows us to capture hundreds of specialty journals without hitting query length limits.
+*   **Oxford Academic (`site:academic.oup.com`)**: Includes *JASN*, *CJASN*, *Kidney360*, *European Heart Journal*.
+*   **ScienceDirect (`site:sciencedirect.com`)**: Includes *JACC*, *AJKD*, *Gastroenterology*, *Am. J. Pathology*.
+*   **Wiley Online (`site:onlinelibrary.wiley.com`)**: Includes *Hepatology*, *Liver Transplantation*.
+*   **Springer (`site:link.springer.com`)**: Includes *Diabetologia*.
+
+### The Dragnet (Safety Net)
+*   **PubMed (`site:pubmed.ncbi.nlm.nih.gov`)**: Catches papers from smaller publishers.
+*   **Preprints**: `site:biorxiv.org`, `site:medrxiv.org`.
+
 ## ✨ Key Features
 
 *   **⚡ Live Intelligence Feed**: Real-time aggregation of scientific literature with sub-second analysis.

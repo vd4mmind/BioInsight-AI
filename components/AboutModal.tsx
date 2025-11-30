@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Cpu, Globe, Zap, Info, Search, BrainCircuit, ShieldCheck, Link2, Database, Layers } from 'lucide-react';
+import { X, Cpu, Globe, Zap, Info, Search, BrainCircuit, Layers, Database } from 'lucide-react';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -58,7 +58,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     <BrainCircuit className="w-3 h-3 text-teal-400" />
                     <div className="text-teal-400 text-xs font-bold">Consolidated Swarms</div>
                 </div>
-                <p className="text-slate-500 text-xs">Replaced single-agent queries with 2 high-density swarms ("Academic" & "Web/Preprint") to maximize coverage while minimizing API calls.</p>
+                <p className="text-slate-500 text-xs">Replaced single-agent queries with 2 high-density swarms ("Hubs" & "Dragnet") to maximize coverage while minimizing API calls.</p>
               </div>
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                 <div className="flex items-center gap-2 mb-1">
@@ -96,7 +96,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
               </li>
               <li>
                 <span className="text-slate-300 font-bold">Parallel Swarm Execution:</span> 
-                If fresh data is needed, we launch the <strong>Academic Swarm</strong> (Nature/NEJM/Lancet) and <strong>Preprint Swarm</strong> (BioRxiv/MedRxiv) sequentially.
+                If fresh data is needed, we launch the <strong>Publisher Hub Swarm</strong> and <strong>Dragnet Swarm</strong> sequentially.
               </li>
               <li>
                 <span className="text-slate-300 font-bold">Streaming & Verification:</span> 
