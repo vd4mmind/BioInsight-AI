@@ -248,8 +248,9 @@ export async function* fetchLiteratureAnalysisStream(activeTopics: string[]): As
     // 2. Optimized Swarm Config (Consolidated Agents)
     const topicStr = activeTopics.slice(0, 3).map(t => TOPIC_EXPANSION[t] || `"${t}"`).join(' OR ');
     
-    // Agent 1: The "Big 4" + Clinical Majors (Consolidated for efficiency)
-    const academicQuery = `(site:nature.com OR site:science.org OR site:nejm.org OR site:thelancet.com OR site:jamanetwork.com OR site:ahajournals.org OR site:diabetesjournals.org) ${topicStr} after:${dateStr}`;
+    // Agent 1: The "Big 4" + Clinical Majors + Specialty High-Impact
+    // Added: cell.com (Obesity/MASH), kidney-international.org (CKD), gastrojournal.org (Liver), aasldpubs (Hepatology)
+    const academicQuery = `(site:nature.com OR site:science.org OR site:nejm.org OR site:thelancet.com OR site:jamanetwork.com OR site:ahajournals.org OR site:diabetesjournals.org OR site:cell.com OR site:kidney-international.org OR site:gastrojournal.org OR site:journal-of-hepatology.eu OR site:aasldpubs.onlinelibrary.wiley.com) ${topicStr} after:${dateStr}`;
     
     // Agent 2: Preprints & Broader Web (Consolidated)
     const preprintQuery = `(site:biorxiv.org OR site:medrxiv.org OR "clinical trial results" OR "new mechanism of action") ${topicStr} after:${dateStr} -news`;
