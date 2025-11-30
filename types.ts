@@ -69,6 +69,7 @@ export interface PaperData {
   funding?: string;
   keywords?: string[];
   isLive?: boolean;
+  isPolished?: boolean; // New flag to track if we've run the deep link agent
 }
 
 export interface DashboardStats {
@@ -77,4 +78,9 @@ export interface DashboardStats {
   preprintCount: number;
   aiMlCount: number;
   clinicalTrialCount: number;
+}
+
+export interface CacheEntry {
+  timestamp: number;
+  papers: PaperData[];
 }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PaperData, PublicationType, Methodology, ResearchModality } from '../types';
-import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Radio, Sparkles, Bookmark, ThumbsUp, ThumbsDown, Biohazard, Newspaper, Microscope, BookOpen, Scale } from 'lucide-react';
+import { FileText, CheckCircle2, FlaskConical, BrainCircuit, Layers, ShieldCheck, ShieldAlert, ExternalLink, ChevronDown, ChevronUp, Building2, Wallet, Tags, Dna, Link2, Check, Radio, Sparkles, Bookmark, ThumbsUp, ThumbsDown, Biohazard, Newspaper, Microscope, BookOpen, Scale, Search, FileSearch } from 'lucide-react';
+import { runLinkPolisher } from '../services/geminiService';
 
 interface PaperCardProps {
   paper: PaperData;
@@ -13,6 +14,11 @@ interface PaperCardProps {
 export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onToggleBookmark, userRating, onRate }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  
+  // Link Polishing State
+  const [isPolishing, setIsPolishing] = useState(false);
+  const [currentUrl, setCurrentUrl] = useState(paper.url);
+  const [linkPolished, setLinkPolished] = useState(paper.isPolished || false);
   
   const isPreprint = paper.publicationType === PublicationType.Preprint;
   const isNews = paper.publicationType === PublicationType.News;
@@ -58,15 +64,25 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
   const { icon: ModalityIcon, colorClass: modalityClass, iconColor: modalityIconColor } = getModalityConfig(paper.modality);
 
   const handleCopyLink = async () => {
-    if (paper.url) {
+    if (currentUrl) {
       try {
-        await navigator.clipboard.writeText(paper.url);
+        await navigator.clipboard.writeText(currentUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch (err) {
         console.error('Failed to copy link', err);
       }
     }
+  };
+
+  const handleImproveLink = async () => {
+      setIsPolishing(true);
+      const betterUrl = await runLinkPolisher(paper);
+      if (betterUrl) {
+          setCurrentUrl(betterUrl);
+          setLinkPolished(true);
+      }
+      setIsPolishing(false);
   };
 
   const getTypeStyles = () => {
@@ -89,6 +105,9 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
   } else {
       containerClasses += ` border-l-slate-600 border-slate-700`;
   }
+
+  // Check if current URL is likely a hub/TOC to suggest improvement
+  const isLikelyHub = currentUrl && (currentUrl.includes('/toc/') || currentUrl.includes('/issue/') || currentUrl.includes('/volume/'));
 
   return (
     <div className={containerClasses}>
@@ -132,9 +151,9 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
             </div>
 
             {/* Title - CLICKABLE LINK */}
-            {paper.url ? (
+            {currentUrl ? (
                  <a 
-                    href={paper.url}
+                    href={currentUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block text-lg font-bold text-slate-100 leading-snug hover:text-blue-400 transition-colors cursor-pointer decoration-blue-400/20 hover:decoration-blue-400 underline-offset-4 line-clamp-2"
@@ -313,18 +332,31 @@ export const PaperCard: React.FC<PaperCardProps> = ({ paper, isBookmarked, onTog
                     </div>
                 )}
                 
-                {paper.url && (
-                    <div className="flex items-center gap-3">
+                {/* Copy Link Button */}
+                {currentUrl && (
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={handleCopyLink}
-                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-green-400 transition-colors group/btn"
+                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-green-400 transition-colors group/btn p-1"
                             title="Copy Link"
                         >
                             {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Link2 className="w-3.5 h-3.5 group-hover/btn:text-green-400" />}
-                            {copied && <span className="hidden md:inline text-[10px] text-green-400 font-medium">Copied</span>}
                         </button>
+                        
+                        {/* Find Better Link Button (Only if hub or unpolished) */}
+                        {isLive && !linkPolished && (
+                            <button
+                                onClick={handleImproveLink}
+                                disabled={isPolishing}
+                                className={`p-1 rounded text-slate-500 hover:text-yellow-400 transition-colors ${isPolishing ? 'animate-spin text-yellow-500' : ''}`}
+                                title="Find Direct PDF Link"
+                            >
+                                <FileSearch className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+
                         <a 
-                            href={paper.url} 
+                            href={currentUrl} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors text-blue-400 hover:text-blue-300 underline decoration-blue-400/30 hover:decoration-blue-300`}

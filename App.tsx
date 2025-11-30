@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { PaperCard } from './components/PaperCard';
@@ -7,9 +7,9 @@ import { TrackerStack } from './components/TrackerStack';
 import { AboutModal } from './components/AboutModal';
 import { PaperData, DiseaseTopic, StudyType, Methodology, PublicationType } from './types';
 import { INITIAL_PAPERS, APP_NAME, APP_VERSION } from './constants';
-import { fetchLiteratureAnalysis } from './services/geminiService';
+import { fetchLiteratureAnalysisStream } from './services/geminiService';
 import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Cell } from 'recharts';
-import { RefreshCw, BookOpen, Activity, FlaskConical, Database, History, Radio, Sparkles, FileText, ArrowDownUp, FilterX, Bookmark, ServerCog } from 'lucide-react';
+import { RefreshCw, BookOpen, Activity, FlaskConical, Database, History, Radio, Sparkles, FileText, ArrowDownUp, FilterX, Bookmark, ServerCog, Timer } from 'lucide-react';
 
 const App: React.FC = () => {
   // --- STATE ---
@@ -48,12 +48,21 @@ const App: React.FC = () => {
   const [lastLiveUpdate, setLastLiveUpdate] = useState<Date | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState<boolean>(true); // Changed to true for auto-open
   const [sortBy, setSortBy] = useState<'date' | 'relevance'>('date');
+  const [cooldown, setCooldown] = useState<number>(0);
 
   // Filters
   const [activeTopics, setActiveTopics] = useState<DiseaseTopic[]>(Object.values(DiseaseTopic));
   const [activeStudyTypes, setActiveStudyTypes] = useState<StudyType[]>(Object.values(StudyType));
   const [activeMethodologies, setActiveMethodologies] = useState<Methodology[]>(Object.values(Methodology));
   const [eraFilter, setEraFilter] = useState<'all' | '5years' | '1year'>('all');
+
+  // Cooldown Timer Effect
+  useEffect(() => {
+    if (cooldown > 0) {
+        const timer = setTimeout(() => setCooldown(prev => prev - 1), 1000);
+        return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
 
   // --- PERSISTENCE EFFECT ---
   useEffect(() => {
@@ -171,41 +180,50 @@ const App: React.FC = () => {
   };
 
   const handleLiveRefresh = async () => {
+    if (cooldown > 0) return;
+
     setIsLoading(true);
     setActiveTab('live'); 
-    setScanStatus("Initializing parallel agents...");
-
-    // INTELLIGENCE TRACKER LOGIC:
-    // We only pass activeTopics. The service will scan for these topics without methodology constraints
-    // to function as a true "RSS" reader.
-    const searchTopics = activeTopics;
-
-    setTimeout(() => setScanStatus("Scanning BioRxiv & MedRxiv..."), 800);
-    setTimeout(() => setScanStatus("Scanning Major Journals (Nature, NEJM)..."), 2000);
-
-    // Call the updated service
-    const newPapers = await fetchLiteratureAnalysis(searchTopics);
+    setScanStatus("Initializing Swarm Intelligence...");
     
-    setScanStatus("Synthesizing results...");
+    // Clear old data to show fresh stream? Or append? 
+    // Let's clear to avoid confusion, but we might want to keep if we implement "Load More"
+    // For now, "Fetch Latest" implies a fresh scan.
+    setLivePapers([]); 
 
-    if (newPapers.length > 0) {
-        setLivePapers(prev => {
-            // Deduplicate against existing live papers logic in App
-            const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-            // Only filter out papers that ALREADY exist in the feed
-            const completelyNew = newPapers.filter(np => {
-                const npFingerprint = normalize(np.title);
-                const isAlreadyListed = prev.some(op => normalize(op.title) === npFingerprint);
-                return !isAlreadyListed;
-            });
+    const searchTopics = activeTopics;
+    
+    try {
+        // STREAMING CONSUMPTION
+        let totalFetched = 0;
+        
+        for await (const batch of fetchLiteratureAnalysisStream(searchTopics)) {
+            const batchSize = batch.length;
+            totalFetched += batchSize;
             
-            return [...completelyNew, ...prev];
-        });
+            setScanStatus(`Processing ${totalFetched} new papers...`);
+            
+            setLivePapers(prev => {
+                const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const completelyNew = batch.filter(np => {
+                    const npFingerprint = normalize(np.title);
+                    const isAlreadyListed = prev.some(op => normalize(op.title) === npFingerprint);
+                    return !isAlreadyListed;
+                });
+                return [...prev, ...completelyNew];
+            });
+        }
+        
         setLastLiveUpdate(new Date());
+        setCooldown(60); // 60s cooldown after successful fetch
+        
+    } catch (e) {
+        console.error("Stream error", e);
+        setScanStatus("Error during scan.");
+    } finally {
+        setScanStatus("");
+        setIsLoading(false);
     }
-    setScanStatus("");
-    setIsLoading(false);
   };
 
   const toggleTopic = (topic: DiseaseTopic) => {
@@ -329,18 +347,23 @@ const App: React.FC = () => {
                         </select>
                     </div>
 
-                    {/* Refresh Button */}
+                    {/* Refresh Button with Cooldown */}
                     <button 
                         onClick={handleLiveRefresh}
-                        disabled={isLoading}
-                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 hover:border-blue-500 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-all"
+                        disabled={isLoading || cooldown > 0}
+                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-medium transition-all ${isLoading || cooldown > 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-blue-500 hover:bg-slate-700 text-slate-300'}`}
                     >
                         {isLoading ? (
                             <ServerCog className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
+                        ) : cooldown > 0 ? (
+                            <Timer className="w-3.5 h-3.5 text-orange-400" />
                         ) : (
                             <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
                         )}
-                        {isLoading ? scanStatus || 'Scanning...' : (activeTab === 'live' ? 'Fetch Latest' : 'Switch to Live')}
+                        
+                        {isLoading ? scanStatus || 'Scanning...' : 
+                         cooldown > 0 ? `Cooldown (${cooldown}s)` :
+                         (activeTab === 'live' ? 'Fetch Latest' : 'Switch to Live')}
                     </button>
                 </div>
              </div>
