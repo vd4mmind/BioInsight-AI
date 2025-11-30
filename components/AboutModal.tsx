@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Cpu, Globe, Zap, Info, Search, BrainCircuit, ShieldCheck, Link2 } from 'lucide-react';
+import { X, Cpu, Globe, Zap, Info, Search, BrainCircuit, ShieldCheck, Link2, Database, Layers } from 'lucide-react';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -43,43 +43,43 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             </h3>
             <p className="text-slate-400 text-sm leading-relaxed">
               BioInsight.AI is a next-generation scientific intelligence platform designed to bridge the gap between static archives and real-time discovery. 
-              We track breakthrough research in CVD, metabolic diseases, and AI-driven biology, providing researchers with instant access to verified data.
+              We track breakthrough research in CVD, metabolic diseases, and AI-driven biology using an optimized, cache-backed AI swarm.
             </p>
           </section>
 
           {/* Technology Grid */}
           <section>
             <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-fuchsia-400" /> Technology Stack: Hybrid Swarm
+              <Cpu className="w-4 h-4 text-fuchsia-400" /> Technology Stack: Streaming Swarm
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                 <div className="flex items-center gap-2 mb-1">
                     <BrainCircuit className="w-3 h-3 text-teal-400" />
-                    <div className="text-teal-400 text-xs font-bold">Sniper Agents</div>
+                    <div className="text-teal-400 text-xs font-bold">Consolidated Swarms</div>
                 </div>
-                <p className="text-slate-500 text-xs">Specialized agents that strictly target high-impact journals (Nature, NEJM) using 'site:' and 'after:' operators for maximum precision.</p>
+                <p className="text-slate-500 text-xs">Replaced single-agent queries with 2 high-density swarms ("Academic" & "Web/Preprint") to maximize coverage while minimizing API calls.</p>
               </div>
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                 <div className="flex items-center gap-2 mb-1">
-                    <Globe className="w-3 h-3 text-indigo-400" />
-                    <div className="text-indigo-400 text-xs font-bold">Trawler Agent</div>
+                    <Database className="w-3 h-3 text-indigo-400" />
+                    <div className="text-indigo-400 text-xs font-bold">Smart Caching Layer</div>
                 </div>
-                <p className="text-slate-500 text-xs">A semantic search agent that casts a wide net using natural language to catch relevant papers from broader sources.</p>
+                <p className="text-slate-500 text-xs">Implements a "Cache-First" strategy (15-min TTL) to provide instant results for frequent queries and protect quota.</p>
               </div>
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                 <div className="flex items-center gap-2 mb-1">
-                    <ShieldCheck className="w-3 h-3 text-green-400" />
-                    <div className="text-green-400 text-xs font-bold">Strict Grounding</div>
+                    <Layers className="w-3 h-3 text-green-400" />
+                    <div className="text-green-400 text-xs font-bold">Streaming Response</div>
                 </div>
-                <p className="text-slate-500 text-xs">Every result is verified against Google Search metadata. If the URL doesn't match the search hit, it's discarded.</p>
+                <p className="text-slate-500 text-xs">Utilizes Generator functions to yield results progressively. You see the first papers in seconds while the deep scan continues.</p>
               </div>
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                 <div className="flex items-center gap-2 mb-1">
-                    <Zap className="w-3 h-3 text-yellow-400" />
-                    <div className="text-yellow-400 text-xs font-bold">Post-Hoc Classification</div>
+                    <Search className="w-3 h-3 text-yellow-400" />
+                    <div className="text-yellow-400 text-xs font-bold">On-Demand Polishing</div>
                 </div>
-                <p className="text-slate-500 text-xs">AI reads abstracts to tag methodologies (AI/ML) automatically, even if not present in the original query.</p>
+                <p className="text-slate-500 text-xs">To improve speed, deep link analysis is now "Lazy Loaded". Click "Find Direct PDF" on any card to trigger the specific search agent.</p>
               </div>
             </div>
           </section>
@@ -87,23 +87,24 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
           {/* How Live Feed Works */}
           <section className="bg-slate-900/30 p-4 rounded-xl border border-dashed border-slate-700">
             <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-blue-400" /> How Live Intelligence Works
+              <Zap className="w-4 h-4 text-blue-400" /> Architecture 2.0 Flow
             </h3>
             <ol className="list-decimal list-inside space-y-3 text-xs text-slate-400">
               <li>
-                <span className="text-slate-300 font-bold">Hybrid Swarm Execution:</span> 
-                <ul className="pl-5 mt-1 space-y-1 list-disc text-slate-500">
-                   <li><span className="text-teal-400">Snipers:</span> Scan specific tiers (General, Clinical, Specialty, Preprints) for papers published in the last 30 days.</li>
-                   <li><span className="text-indigo-400">Trawler:</span> Scans the broader web for semantic relevance.</li>
-                </ul>
+                <span className="text-slate-300 font-bold">Check Cache:</span> 
+                System checks for a recent valid scan (fingerprinted by topics) to load instantly.
               </li>
               <li>
-                <span className="text-slate-300 font-bold">Verification & Synthesis:</span> 
-                The system merges results, removes duplicates (favoring Sniper hits), and enforces a strict 30-day verified date window.
+                <span className="text-slate-300 font-bold">Parallel Swarm Execution:</span> 
+                If fresh data is needed, we launch the <strong>Academic Swarm</strong> (Nature/NEJM/Lancet) and <strong>Preprint Swarm</strong> (BioRxiv/MedRxiv) sequentially.
               </li>
               <li>
-                <span className="text-slate-300 font-bold">Auto-Classification:</span> 
-                Found papers are automatically analyzed to identify study designs (RCTs) and methodologies (AI/ML) without user intervention.
+                <span className="text-slate-300 font-bold">Streaming & Verification:</span> 
+                Results are grounded against Google Search metadata and streamed to the UI immediately upon verification.
+              </li>
+              <li>
+                <span className="text-slate-300 font-bold">Lazy Enrichment:</span> 
+                Users browse quickly. Heavy tasks (finding direct PDF links) are only executed when you explicitly request them.
               </li>
             </ol>
           </section>

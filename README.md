@@ -20,42 +20,35 @@ It features a dual-mode architecture:
 1.  **Archive Mode**: A curated, validated library of landmark clinical trials and papers (2010–Present).
 2.  **Live Intelligence Feed**: A real-time, multi-agent system that aggregates, verifies, and classifies research from the last 30 days.
 
-## 🧠 Core Architecture: Hybrid Swarm
+## 🧠 Core Architecture: Optimized Streaming Swarm (v2.0)
 
-BioInsight.AI utilizes a **Hybrid Swarm Architecture** that combines high-precision targeting with broad semantic search.
+BioInsight.AI utilizes a **Hybrid Swarm Architecture** optimized for performance and resilience against API rate limits.
 
-### 1. The Swarm
-Instead of a single search query, the system dispatches 5 specialized AI agents simultaneously:
+### 1. The Consolidated Swarm
+We have consolidated 5 specific agents into 2 high-density swarms to reduce network overhead:
+*   **Pipeline A: The Academic Swarm**: A massive Boolean query agent targeting the "Big 4" (Nature, Science, NEJM, Lancet) + Specialty Journals (AHA, Diabetes, JAMA) in a single pass.
+*   **Pipeline B: The Preprint & Web Swarm**: Scans BioRxiv, MedRxiv, and performs semantic trawling for broader web results.
 
-#### Pipeline A: The Snipers (Precision)
-These agents use strict `site:` and `after:` operators to force the search engine to retrieve recent content from specific high-tier domains.
-*   **🦅 Sniper-General**: Targets *Nature, Science, Cell, PNAS*.
-*   **🏥 Sniper-Clinical**: Targets *NEJM, The Lancet, JAMA, BMJ*.
-*   **🔬 Sniper-Specialty**: Targets *AHA Journals, Diabetes Journals, EMBO*.
-*   **🕵️ Sniper-Preprint**: Targets *BioRxiv, MedRxiv*.
+### 2. "Cache-First, Ask-Later" Strategy
+*   **Smart Caching**: Every search result is hashed and stored locally with a 15-minute Time-To-Live (TTL).
+*   **Benefit**: This prevents accidental quota burn and provides instant load times for repeat visits.
 
-#### Pipeline B: The Trawler (Breadth)
-*   **🌐 Trawler-Semantic**: Uses natural language ("latest research papers...") to catch relevant studies from broader sources that the Snipers might miss, leveraging Google's semantic understanding.
+### 3. Streaming Response Engine
+*   **Generator Pattern**: The UI does not wait for the entire scan to finish. 
+*   **Instant Feedback**: Papers are yielded to the dashboard as soon as the first agent returns, reducing perceived latency to <2 seconds.
 
-### 2. Strict Grounding (Zero Hallucination Policy)
-The platform enforces a "Grounding-First" verification layer.
-*   **Verification**: Every paper returned by an agent is cross-referenced with Google Search metadata.
-*   **Source of Truth**: The application **discards** any result where the URL/Title cannot be cryptographically matched to a real-world search hit.
-*   **Result**: 100% verified links. No broken URLs. No made-up titles.
-
-### 3. Post-Hoc Classification
-To ensure an "RSS-like" experience with high recall:
-*   **Search Phase**: Agents search broadly based on **Disease Topics** (e.g., "CVD") and **Time** (Last 30 days).
-*   **Analysis Phase**: The AI reads the abstract of every found paper to *automatically classify* it into Methodologies (e.g., "AI/ML") or Study Types (e.g., "Clinical Trial"), even if those keywords weren't in the original search query.
+### 4. On-Demand Enrichment (Lazy Loading)
+*   **Link Polishing**: To save resources, the system finds the generic URL first.
+*   **User Action**: Only when a user clicks **"Find Direct PDF"** does a specialized agent fire to hunt for the specific PDF/Full-Text link.
 
 ## ✨ Key Features
 
 *   **⚡ Live Intelligence Feed**: Real-time aggregation of scientific literature with sub-second analysis.
 *   **🛡️ Verified Sources**: Strict domain filtering ensures data comes only from trusted academic publishers.
 *   **🤖 Smart Tagging**: Auto-detection of "AI/ML" methods, "Clinical Trials", and "Preprints".
+*   **⏱️ 60s Cooldown**: Built-in rate limiting protection to ensure API stability.
 *   **🔖 Bookmarks & Ratings**: Local-first persistence allows users to save papers and rate relevance (`localStorage` backed).
 *   **📊 Visual Analytics**: Real-time charts showing the distribution of topics and trends in the current feed.
-*   **⏳ Time Travel**: Filter by "Last 30 Days", "Since Jan 2024", or "5 Year History".
 
 ## 🛠️ Tech Stack
 
@@ -65,7 +58,7 @@ To ensure an "RSS-like" experience with high recall:
     *   **Model**: `gemini-2.5-flash` (Optimized for low-latency reasoning)
     *   **Tooling**: Google Search Grounding (`googleSearch`)
 *   **UI/UX**: Tailwind CSS, Lucide React, Recharts
-*   **State**: React Hooks + LocalStorage Persistence
+*   **State**: React Hooks + LocalStorage Persistence + Generator Functions
 
 ## 📦 Installation & Setup
 
