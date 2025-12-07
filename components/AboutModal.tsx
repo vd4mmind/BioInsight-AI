@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Cpu, Globe, Zap, Info, Search, BrainCircuit, Layers, Database } from 'lucide-react';
+import { X, Cpu, Globe, Zap, Info, Search, BrainCircuit, Layers, Database, Filter } from 'lucide-react';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -76,10 +76,10 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
               </div>
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                 <div className="flex items-center gap-2 mb-1">
-                    <Search className="w-3 h-3 text-yellow-400" />
-                    <div className="text-yellow-400 text-xs font-bold">On-Demand Polishing</div>
+                    <Filter className="w-3 h-3 text-rose-400" />
+                    <div className="text-rose-400 text-xs font-bold">Signal Denoising</div>
                 </div>
-                <p className="text-slate-500 text-xs">To improve speed, deep link analysis is now "Lazy Loaded". Click "Find Direct PDF" on any card to trigger the specific search agent.</p>
+                <p className="text-slate-500 text-xs">New "Structural Anchor" logic forces results to contain statistical markers (e.g., "p-value"), filtering out 90% of editorials in Obesity & Diabetes.</p>
               </div>
             </div>
           </section>

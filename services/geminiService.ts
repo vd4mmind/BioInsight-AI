@@ -9,14 +9,15 @@ const CACHE_KEY_PREFIX = 'bioinsight_cache_v2_';
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 Minutes
 
 // --- TOPIC EXPANSION MAP ---
+// Updated with Option 2: Title Constraints & High-Signal Proxies (Drugs/Targets)
 const TOPIC_EXPANSION: Record<string, string> = {
     'MASH': '("MASH" OR "NASH" OR "MASLD" OR "Steatohepatitis")',
     'NASH': '("MASH" OR "NASH" OR "MASLD" OR "Steatohepatitis")',
     'MASLD': '("MASH" OR "NASH" OR "MASLD" OR "Steatohepatitis")',
-    'Obesity': '("Obesity" OR "BMI" OR "Adiposity" OR "Weight Loss")',
-    'Diabetes': '("Diabetes" OR "T2D" OR "Type 2 Diabetes" OR "Insulin")',
-    'CVD': '("Cardiovascular" OR "Heart Failure" OR "Atherosclerosis" OR "Myocardial")',
-    'CKD': '("Chronic Kidney Disease" OR "CKD" OR "Renal Failure" OR "Nephropathy")'
+    'Obesity': '(intitle:"Obesity" OR intitle:"Weight Loss" OR intitle:"BMI" OR intitle:"Semaglutide" OR intitle:"Tirzepatide" OR intitle:"GLP-1")',
+    'Diabetes': '(intitle:"Diabetes" OR intitle:"Type 2" OR intitle:"T2D" OR intitle:"HbA1c" OR intitle:"Insulin" OR intitle:"SGLT2")',
+    'CVD': '("Cardiovascular" OR "Heart Failure" OR "Atherosclerosis" OR "Myocardial" OR "HFrEF")',
+    'CKD': '("Chronic Kidney Disease" OR "CKD" OR "Renal Failure" OR "Nephropathy" OR "Glomerular")'
 };
 
 // --- HELPER FUNCTIONS ---
@@ -248,16 +249,17 @@ export async function* fetchLiteratureAnalysisStream(activeTopics: string[]): As
     // 2. Optimized Hub & Spoke Config
     const topicStr = activeTopics.slice(0, 3).map(t => TOPIC_EXPANSION[t] || `"${t}"`).join(' OR ');
     
+    // Option 1: Structural Anchors
+    // We strictly enforce these terms to filter out "News", "Collections", and "Editorials" 
+    // that often pollute searches for high-volume terms like Obesity.
+    const structuralAnchors = '("p-value" OR "confidence interval" OR "randomized" OR "cohort" OR "hazard ratio" OR "mechanism")';
+
     // Agent 1: The "Hub & Spoke" Model - High Precision
-    // Includes "Big 4" + Specialty Societies + Major Publisher Hubs (Elsevier, Oxford, Springer, Wiley)
-    // - academic.oup.com covers JASN, CJASN, Kidney360, EHJ
-    // - sciencedirect.com covers JACC, AJKD, Cell, Lancet family, Gastro
-    // - link.springer.com covers Diabetologia
-    // - onlinelibrary.wiley.com covers Hepatology (AASLD)
-    const academicQuery = `(site:nature.com OR site:science.org OR site:nejm.org OR site:thelancet.com OR site:jamanetwork.com OR site:ahajournals.org OR site:diabetesjournals.org OR site:cell.com OR site:academic.oup.com OR site:sciencedirect.com OR site:link.springer.com OR site:onlinelibrary.wiley.com) ${topicStr} after:${dateStr}`;
+    // We inject structuralAnchors to ensure we only get Research Papers, not Landing Pages.
+    const academicQuery = `(site:nature.com OR site:science.org OR site:nejm.org OR site:thelancet.com OR site:jamanetwork.com OR site:ahajournals.org OR site:diabetesjournals.org OR site:cell.com OR site:academic.oup.com OR site:sciencedirect.com OR site:link.springer.com OR site:onlinelibrary.wiley.com) ${topicStr} ${structuralAnchors} after:${dateStr} -news -editorial`;
     
     // Agent 2: The Safety Net (PubMed) + Preprints - High Recall
-    // Captures anything missed by Agent 1 or published in smaller journals.
+    // PubMed is structurally cleaner, but we still exclude news.
     const dragnetQuery = `(site:pubmed.ncbi.nlm.nih.gov OR site:biorxiv.org OR site:medrxiv.org) ${topicStr} after:${dateStr} -news`;
 
     const swarmConfig = [
