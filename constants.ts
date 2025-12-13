@@ -1,7 +1,7 @@
 import { DiseaseTopic, Methodology, ResearchModality, PaperData, PublicationType, StudyType } from "./types";
 
 export const APP_NAME = "BioInsight Tracker";
-export const APP_VERSION = "2.0.0";
+export const APP_VERSION = "2.1.0";
 
 // Curated Landmark Papers (2010 - Present)
 export const INITIAL_PAPERS: PaperData[] = [
@@ -33,7 +33,7 @@ export const INITIAL_PAPERS: PaperData[] = [
     journalOrConference: 'The New England Journal of Medicine',
     date: '2024-02-08',
     authors: ['S.A. Harrison', 'P. Bedossa', 'et al.'],
-    topic: DiseaseTopic.NASH,
+    topic: DiseaseTopic.MASH,
     publicationType: PublicationType.PeerReviewed,
     studyType: StudyType.ClinicalTrial,
     methodology: Methodology.Statistical,

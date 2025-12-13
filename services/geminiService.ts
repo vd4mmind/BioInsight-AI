@@ -6,14 +6,16 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- CACHE CONFIGURATION ---
 const CACHE_KEY_PREFIX = 'bioinsight_cache_v2_';
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 Minutes
+// Live Feed: 15 Minutes
+const CACHE_TTL_LIVE = 15 * 60 * 1000; 
+// AI Feed: 24 Hours
+const CACHE_TTL_AI = 24 * 60 * 60 * 1000;
+// Patent Feed: 7 Days
+const CACHE_TTL_PATENT = 7 * 24 * 60 * 60 * 1000;
 
 // --- TOPIC EXPANSION MAP ---
-// Updated with Option 2: Title Constraints & High-Signal Proxies (Drugs/Targets)
 const TOPIC_EXPANSION: Record<string, string> = {
-    'MASH': '("MASH" OR "NASH" OR "MASLD" OR "Steatohepatitis")',
-    'NASH': '("MASH" OR "NASH" OR "MASLD" OR "Steatohepatitis")',
-    'MASLD': '("MASH" OR "NASH" OR "MASLD" OR "Steatohepatitis")',
+    'MASH / NASH': '("MASH" OR "NASH" OR "MASLD" OR "Steatohepatitis")',
     'Obesity': '(intitle:"Obesity" OR intitle:"Weight Loss" OR intitle:"BMI" OR intitle:"Semaglutide" OR intitle:"Tirzepatide" OR intitle:"GLP-1")',
     'Diabetes': '(intitle:"Diabetes" OR intitle:"Type 2" OR intitle:"T2D" OR intitle:"HbA1c" OR intitle:"Insulin" OR intitle:"SGLT2")',
     'CVD': '("Cardiovascular" OR "Heart Failure" OR "Atherosclerosis" OR "Myocardial" OR "HFrEF")',
@@ -22,25 +24,29 @@ const TOPIC_EXPANSION: Record<string, string> = {
 
 // --- HELPER FUNCTIONS ---
 
-const getCacheKey = (topics: string[]): string => {
+const getCacheKey = (type: 'live' | 'ai' | 'patent', topics: string[]): string => {
     const sorted = [...topics].sort().join('_');
-    return `${CACHE_KEY_PREFIX}${sorted}`;
+    return `${CACHE_KEY_PREFIX}${type}_${sorted}`;
 };
 
-const checkCache = (topics: string[]): PaperData[] | null => {
+const checkCache = (type: 'live' | 'ai' | 'patent', topics: string[]): PaperData[] | null => {
     try {
-        const key = getCacheKey(topics);
+        const key = getCacheKey(type, topics);
         const stored = localStorage.getItem(key);
         if (!stored) return null;
 
         const entry: CacheEntry = JSON.parse(stored);
         const now = Date.now();
+        
+        let ttl = CACHE_TTL_LIVE;
+        if (type === 'ai') ttl = CACHE_TTL_AI;
+        if (type === 'patent') ttl = CACHE_TTL_PATENT;
 
-        if (now - entry.timestamp < CACHE_TTL_MS) {
-            console.log(`[Cache Hit] Returning ${entry.papers.length} papers from local storage.`);
+        if (now - entry.timestamp < ttl) {
+            console.log(`[Cache Hit - ${type}] Returning ${entry.papers.length} items.`);
             return entry.papers;
         } else {
-            console.log(`[Cache Expired] Removing old data.`);
+            console.log(`[Cache Expired - ${type}] Removing old data.`);
             localStorage.removeItem(key);
             return null;
         }
@@ -49,9 +55,9 @@ const checkCache = (topics: string[]): PaperData[] | null => {
     }
 };
 
-const saveCache = (topics: string[], papers: PaperData[]) => {
+const saveCache = (type: 'live' | 'ai' | 'patent', topics: string[], papers: PaperData[]) => {
     try {
-        const key = getCacheKey(topics);
+        const key = getCacheKey(type, topics);
         const entry: CacheEntry = {
             timestamp: Date.now(),
             papers: papers
@@ -89,34 +95,72 @@ const checkTokenOverlap = (aiTitle: string, targetText: string): boolean => {
     return (matches.length / aiTokens.length) >= 0.4;
 };
 
-// --- CORE HYBRID AGENT FUNCTION ---
+// Robust mapping to ensure legacy/synonym topics map to the new "MASH / NASH" enum value
+const mapToDiseaseTopic = (input: string): DiseaseTopic => {
+    const upper = input?.toUpperCase() || '';
+    if (upper.includes('NASH') || upper.includes('MASH') || upper.includes('MASLD') || upper.includes('STEATOHEPATITIS')) {
+        return DiseaseTopic.MASH; // Returns 'MASH / NASH'
+    }
+    // Iterate keys to find match
+    for (const key in DiseaseTopic) {
+        if (upper === key) {
+            return DiseaseTopic[key as keyof typeof DiseaseTopic];
+        }
+    }
+    // Iterate values to find match
+    for (const value of Object.values(DiseaseTopic)) {
+         if (upper === value.toUpperCase()) return value;
+    }
+    
+    return DiseaseTopic.CVD; // Default fallback
+};
+
+// --- AGENT GENERATOR CORE ---
 
 const runHybridAgent = async (
     agentName: string, 
     searchQuery: string, 
-    cutoffDate: Date
+    cutoffDate: Date,
+    feedType: 'live' | 'ai' | 'patent'
 ): Promise<PaperData[]> => {
     const modelId = "gemini-2.5-flash"; 
 
-    const systemPrompt = `
-        You are the ${agentName}. Find scientific papers based on the query.
-        
+    // Customized System Prompts based on Feed Type
+    // IMPL: Option 2 (Negative Prompt Tuning)
+    let instructionBlock = `
         **INSTRUCTIONS:**
         1.  Use 'googleSearch' with query: \`${searchQuery}\`
         2.  **EXTRACT:** Articles, Clinical Trials, Preprints.
-        3.  **DOI:** Extract DOI if available.
+        3.  **EXCLUDE:** Generic reviews, editorials, commentaries, "Perspectives", opinion pieces, or news items that do not contain original data or statistical analysis.
         4.  **STRICT VERIFICATION:** 'url' MUST match a search result.
+    `;
+    
+    if (feedType === 'patent') {
+        instructionBlock = `
+        **INSTRUCTIONS (PATENT MODE):**
+        1.  Use 'googleSearch' with query: \`${searchQuery}\`
+        2.  **EXTRACT:** Patent Applications, Grants.
+        3.  **EXCLUDE:** Legal commentaries, law firm advertisements, general IP news, or press releases.
+        4.  **MAPPING:** 
+            - 'authors' = Assignee/Company (e.g. Novo Nordisk).
+            - 'journalOrConference' = Patent Office (e.g. USPTO, WIPO).
+        `;
+    }
+
+    const systemPrompt = `
+        You are the ${agentName}.
+        ${instructionBlock}
         
         **JSON SCHEMA:**
         [
           {
             "url": "Exact URL from search result",
-            "title": "Full academic title",
+            "title": "Full title",
             "date": "YYYY-MM-DD",
-            "authors": ["Author 1", "et al"],
+            "authors": ["Author 1" (or Assignee for Patents)],
             "doi": "10.xxxx/xxxxx",
-            "topic": "CVD | CKD | MASH | Diabetes | Obesity",
-            "publicationType": "Preprint | Peer Reviewed | Review Article | Meta-Analysis | News/Analysis",
+            "topic": "CVD | CKD | MASH | NASH | MASLD | Diabetes | Obesity",
+            "publicationType": "Preprint | Peer Reviewed | Review Article | Patent",
             "studyType": "Clinical Trial | Human Cohort | Pre-clinical | Simulated",
             "methodology": "AI/ML | Lab Experimental | Statistical",
             "modality": "Genetics | Proteomics | Imaging | Clinical Data | Other",
@@ -144,15 +188,14 @@ const runHybridAgent = async (
         if (aiJson.length === 0 || groundingChunks.length === 0) return [];
 
         const verifiedPapers: PaperData[] = [];
-        const thirtyDaysAgoTime = cutoffDate.getTime();
+        const cutoffTime = cutoffDate.getTime();
 
         for (const item of aiJson) {
             const matchedChunk = groundingChunks.find((c: any) => {
                 if (!c.web?.uri) return false;
                 const exactUrlMatch = item.url && c.web.uri === item.url;
                 const titleMatch = c.web.title ? checkTokenOverlap(item.title, c.web.title) : false;
-                const snippetMatch = (c.web.snippet || c.web.content) ? checkTokenOverlap(item.title, (c.web.snippet || c.web.content)) : false;
-                return exactUrlMatch || titleMatch || snippetMatch;
+                return exactUrlMatch || titleMatch;
             });
 
             if (!matchedChunk || !matchedChunk.web?.uri) continue;
@@ -162,6 +205,7 @@ const runHybridAgent = async (
                 finalUrl = `https://doi.org/${item.doi.trim()}`;
             }
 
+            // Date Parsing & Filtering
             let itemDate = new Date(item.date);
             if (isNaN(itemDate.getTime())) {
                 const snippet = (matchedChunk.web.title + " " + (matchedChunk.web.snippet || "")).toLowerCase();
@@ -172,24 +216,24 @@ const runHybridAgent = async (
                 }
             }
 
-            if (itemDate.getTime() < thirtyDaysAgoTime) continue;
+            if (itemDate.getTime() < cutoffTime) continue;
 
             verifiedPapers.push({
-                id: `live-${Math.random().toString(36).substr(2, 9)}`,
+                id: `${feedType}-${Math.random().toString(36).substr(2, 9)}`,
                 title: item.title,
                 url: finalUrl,
-                journalOrConference: new URL(finalUrl).hostname.replace('www.', ''),
+                journalOrConference: item.journalOrConference || new URL(finalUrl).hostname.replace('www.', ''),
                 date: itemDate.toISOString().split('T')[0],
                 authors: item.authors || ["Unknown"],
-                topic: (item.topic in DiseaseTopic) ? item.topic : DiseaseTopic.CVD,
-                publicationType: (item.publicationType in PublicationType) ? item.publicationType : PublicationType.PeerReviewed,
+                topic: mapToDiseaseTopic(item.topic), // Use strict mapper
+                publicationType: feedType === 'patent' ? PublicationType.Patent : ((item.publicationType in PublicationType) ? item.publicationType : PublicationType.PeerReviewed),
                 studyType: (item.studyType in StudyType) ? item.studyType : StudyType.PreClinical,
-                methodology: (item.methodology in Methodology) ? item.methodology : Methodology.Statistical,
+                methodology: feedType === 'ai' ? Methodology.AIML : ((item.methodology in Methodology) ? item.methodology : Methodology.Statistical),
                 modality: (item.modality in ResearchModality) ? item.modality : ResearchModality.Other,
                 abstractHighlight: item.abstractHighlight || "Summary unavailable.",
                 drugAndTarget: item.drugAndTarget || "N/A",
-                context: item.context || "Live Feed Result",
-                validationScore: agentName.includes("Hub") ? 100 : 90, 
+                context: item.context || `${feedType.toUpperCase()} Feed Result`,
+                validationScore: 90, 
                 authorsVerified: false,
                 isLive: true,
                 isPolished: false
@@ -204,6 +248,87 @@ const runHybridAgent = async (
     }
 };
 
+// --- EXPORTED STREAMS ---
+
+// 1. LIVE LITERATURE STREAM (Original)
+export async function* fetchLiteratureAnalysisStream(activeTopics: string[]): AsyncGenerator<PaperData[], void, unknown> {
+    const cachedData = checkCache('live', activeTopics);
+    if (cachedData) { yield cachedData; return; }
+
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const dateStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+    // Use expansion map or fallback to quotes
+    const topicStr = activeTopics.map(t => TOPIC_EXPANSION[t] || `"${t}"`).join(' OR ');
+    const structuralAnchors = '("p-value" OR "confidence interval" OR "randomized" OR "cohort")';
+
+    const swarmConfig = [
+        { name: "Publisher Hub Swarm", query: `(site:nature.com OR site:nejm.org OR site:thelancet.com OR site:jamanetwork.com OR site:sciencedirect.com OR site:onlinelibrary.wiley.com) ${topicStr} ${structuralAnchors} after:${dateStr} -news -editorial -commentary` },
+        { name: "PubMed & Preprint Dragnet", query: `(site:pubmed.ncbi.nlm.nih.gov OR site:biorxiv.org OR site:medrxiv.org) ${topicStr} after:${dateStr} -news` }
+    ];
+
+    let allCollectedPapers: PaperData[] = [];
+    for (const agent of swarmConfig) {
+        await new Promise(r => setTimeout(r, 500));
+        const batchResults = await runHybridAgent(agent.name, agent.query, thirtyDaysAgo, 'live');
+        if (batchResults.length > 0) {
+            allCollectedPapers = [...allCollectedPapers, ...batchResults];
+            yield batchResults;
+        }
+    }
+    if (allCollectedPapers.length > 0) saveCache('live', activeTopics, allCollectedPapers);
+}
+
+// 2. AI/ML NEXUS STREAM (New)
+export async function* fetchAiAnalysisStream(activeTopics: string[]): AsyncGenerator<PaperData[], void, unknown> {
+    const cachedData = checkCache('ai', activeTopics);
+    if (cachedData) { yield cachedData; return; }
+
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const dateStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+    // Use expansion map to ensure synonyms (NASH, MASLD) are searched
+    const topicStr = activeTopics.map(t => TOPIC_EXPANSION[t] || `"${t}"`).join(' OR '); 
+    const aiKeywords = '("Machine Learning" OR "Deep Learning" OR "Transformer" OR "Large Language Model" OR "Computer Vision" OR "Generative AI")';
+    const clinicalKeywords = '("EHR" OR "Electronic Health Records" OR "MRI" OR "CT Scan" OR "Histopathology" OR "Clinical Cohort" OR "Real-world evidence")';
+    
+    // IMPL: Option 2 (Enhanced Exclusion)
+    const exclusion = '-mouse -rat -murine -vitro -preclinical -"animal model" -editorial -commentary -"opinion"';
+
+    const query = `${topicStr} AND ${aiKeywords} AND ${clinicalKeywords} ${exclusion} after:${dateStr} (site:nature.com OR site:arxiv.org OR site:medrxiv.org OR site:pubmed.ncbi.nlm.nih.gov)`;
+
+    const batchResults = await runHybridAgent("AI Specialist Agent", query, thirtyDaysAgo, 'ai');
+    if (batchResults.length > 0) {
+        yield batchResults;
+        saveCache('ai', activeTopics, batchResults);
+    }
+}
+
+// 3. PATENT STREAM (New)
+export async function* fetchPatentStream(activeTopics: string[]): AsyncGenerator<PaperData[], void, unknown> {
+    const cachedData = checkCache('patent', activeTopics);
+    if (cachedData) { yield cachedData; return; }
+
+    const today = new Date();
+    const ninetyDaysAgo = new Date(today.getTime() - (90 * 24 * 60 * 60 * 1000)); // Patents move slower
+    const dateStr = ninetyDaysAgo.toISOString().split('T')[0];
+
+    // Use expansion map to ensure synonyms (NASH, MASLD) are searched
+    const topicStr = activeTopics.map(t => TOPIC_EXPANSION[t] || `"${t}"`).join(' OR ');
+    const typeKeywords = '("Method" OR "System" OR "Composition" OR "Apparatus")';
+
+    // Target Google Patents or similar repositories
+    const query = `(site:patents.google.com/patent/ OR site:freepatentsonline.com) ${topicStr} AND ${typeKeywords} after:${dateStr}`;
+
+    const batchResults = await runHybridAgent("Patent Clerk Agent", query, ninetyDaysAgo, 'patent');
+    if (batchResults.length > 0) {
+        yield batchResults;
+        saveCache('patent', activeTopics, batchResults);
+    }
+}
+
 // --- ON-DEMAND LINK POLISHER (EXPOSED) ---
 export const runLinkPolisher = async (paper: PaperData): Promise<string | null> => {
     if (!paper.url) return null;
@@ -216,7 +341,6 @@ export const runLinkPolisher = async (paper: PaperData): Promise<string | null> 
         
         // @ts-ignore
         const chunks = response?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-        // Filter out hubs, look for deep links
         const betterChunk = chunks.find((c: any) => {
             const uri = c.web?.uri?.toLowerCase();
             return uri && 
@@ -230,69 +354,3 @@ export const runLinkPolisher = async (paper: PaperData): Promise<string | null> 
         return null;
     }
 };
-
-// --- STREAMING ORCHESTRATOR ---
-
-export async function* fetchLiteratureAnalysisStream(activeTopics: string[]): AsyncGenerator<PaperData[], void, unknown> {
-    
-    // 1. Check Cache First
-    const cachedData = checkCache(activeTopics);
-    if (cachedData) {
-        yield cachedData;
-        return;
-    }
-
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
-    const dateStr = thirtyDaysAgo.toISOString().split('T')[0];
-
-    // 2. Optimized Hub & Spoke Config
-    const topicStr = activeTopics.slice(0, 3).map(t => TOPIC_EXPANSION[t] || `"${t}"`).join(' OR ');
-    
-    // Option 1: Structural Anchors
-    // We strictly enforce these terms to filter out "News", "Collections", and "Editorials" 
-    // that often pollute searches for high-volume terms like Obesity.
-    const structuralAnchors = '("p-value" OR "confidence interval" OR "randomized" OR "cohort" OR "hazard ratio" OR "mechanism")';
-
-    // Agent 1: The "Hub & Spoke" Model - High Precision
-    // We inject structuralAnchors to ensure we only get Research Papers, not Landing Pages.
-    const academicQuery = `(site:nature.com OR site:science.org OR site:nejm.org OR site:thelancet.com OR site:jamanetwork.com OR site:ahajournals.org OR site:diabetesjournals.org OR site:cell.com OR site:academic.oup.com OR site:sciencedirect.com OR site:link.springer.com OR site:onlinelibrary.wiley.com) ${topicStr} ${structuralAnchors} after:${dateStr} -news -editorial`;
-    
-    // Agent 2: The Safety Net (PubMed) + Preprints - High Recall
-    // PubMed is structurally cleaner, but we still exclude news.
-    const dragnetQuery = `(site:pubmed.ncbi.nlm.nih.gov OR site:biorxiv.org OR site:medrxiv.org) ${topicStr} after:${dateStr} -news`;
-
-    const swarmConfig = [
-        { name: "Publisher Hub Swarm", query: academicQuery },
-        { name: "PubMed & Preprint Dragnet", query: dragnetQuery }
-    ];
-
-    let allCollectedPapers: PaperData[] = [];
-
-    // 3. Sequential Execution with Yield (Streaming)
-    // We run them one by one to prevent 429 errors and allow the UI to update progressively.
-    for (const agent of swarmConfig) {
-        // Small throttle before request
-        await new Promise(r => setTimeout(r, 500));
-        
-        const batchResults = await runHybridAgent(agent.name, agent.query, thirtyDaysAgo);
-        
-        if (batchResults.length > 0) {
-            allCollectedPapers = [...allCollectedPapers, ...batchResults];
-            yield batchResults; // SEND DATA TO UI IMMEDIATELY
-        }
-    }
-
-    // 4. Save to Cache if we found data
-    if (allCollectedPapers.length > 0) {
-        // Deduplicate before saving
-        const seen = new Set<string>();
-        const unique = allCollectedPapers.filter(p => {
-            const fp = p.title.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 30);
-            if (seen.has(fp)) return false;
-            seen.add(fp);
-            return true;
-        });
-        saveCache(activeTopics, unique);
-    }
-}

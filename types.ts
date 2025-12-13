@@ -1,9 +1,7 @@
 export enum DiseaseTopic {
   CVD = 'CVD',
   CKD = 'CKD',
-  MASH = 'MASH',
-  NASH = 'NASH',
-  MASLD = 'MASLD',
+  MASH = 'MASH / NASH',
   Diabetes = 'Diabetes',
   Obesity = 'Obesity'
 }
@@ -15,7 +13,8 @@ export enum PublicationType {
   ConferenceAbstract = 'Conference Abstract',
   Poster = 'Poster',
   ReviewArticle = 'Review Article',
-  MetaAnalysis = 'Meta-Analysis'
+  MetaAnalysis = 'Meta-Analysis',
+  Patent = 'Patent'
 }
 
 export enum StudyType {

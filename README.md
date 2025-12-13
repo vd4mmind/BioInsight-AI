@@ -20,7 +20,7 @@ It features a dual-mode architecture:
 1.  **Archive Mode**: A curated, validated library of landmark clinical trials and papers (2010–Present).
 2.  **Live Intelligence Feed**: A real-time, multi-agent system that aggregates, verifies, and classifies research from the last 30 days.
 
-## 🧠 Core Architecture: Hub & Spoke Swarm (v2.2)
+## 🧠 Core Architecture: Hub & Spoke Swarm (v2.1)
 
 BioInsight.AI utilizes a **Hybrid Swarm Architecture** optimized for high-recall performance and resilience against API rate limits.
 
@@ -37,10 +37,11 @@ To bypass query length limits while ensuring coverage of 1000+ specialty journal
 *   **Generator Pattern**: The UI does not wait for the entire scan to finish. 
 *   **Instant Feedback**: Papers are yielded to the dashboard as soon as the first agent returns, reducing perceived latency to <2 seconds.
 
-### 4. Semantic Signal Denoising (New in v2.2)
+### 4. Semantic Signal Denoising (New in v2.1)
 To combat "Semantic Noise Saturation" in high-volume topics like **Obesity** and **Diabetes**, we introduced a dual-layer filtering strategy:
 *   **Title Constraints**: Uses `intitle:` operators to ensure the paper is *primarily* about the topic, not just a footnote.
 *   **Structural Anchors**: The search query now strictly enforces the presence of methodological keywords (`"p-value"`, `"confidence interval"`, `"randomized"`). This effectively strips out editorials, news, and collection pages, ensuring only data-rich primary research enters the analysis pipeline.
+*   **Negative Prompt Tuning**: The AI Agents now use explicit negative constraints (e.g., `-editorial`, `-commentary`) in both the search query and the extraction instructions to reject non-data-driven content.
 
 ## 📚 Active Source Watchlist
 

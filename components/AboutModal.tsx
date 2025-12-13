@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Cpu, Globe, Zap, Info, Search, BrainCircuit, Layers, Database, Filter } from 'lucide-react';
+import { X, Cpu, Globe, Zap, Info, Search, BrainCircuit, Layers, Database, Filter, Sparkles, Check } from 'lucide-react';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -35,6 +35,33 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
 
         {/* Scrollable Body */}
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+
+          {/* Release Notes Section - NEW */}
+          <section className="bg-gradient-to-r from-blue-900/40 to-teal-900/40 p-4 rounded-xl border border-blue-500/30">
+            <h3 className="text-sm font-bold text-blue-200 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-yellow-400" /> New in Version 2.1
+            </h3>
+            <ul className="space-y-2 text-xs text-slate-300">
+              <li className="flex items-start gap-2">
+                <Check className="w-3.5 h-3.5 text-green-400 mt-0.5 shrink-0" />
+                <span>
+                  <strong className="text-white">Enhanced Signal Denoising:</strong> Implemented "Negative Prompt Tuning" to strictly exclude editorials, generic reviews, and opinion pieces from the AI Feed.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-3.5 h-3.5 text-green-400 mt-0.5 shrink-0" />
+                <span>
+                  <strong className="text-white">Unified Liver Disease Tracking:</strong> MASH, NASH, and MASLD are now consolidated into a single high-recall topic channel.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-3.5 h-3.5 text-green-400 mt-0.5 shrink-0" />
+                <span>
+                  <strong className="text-white">Historical Patent Search:</strong> The Patent Agent now automatically maps modern terms (MASH) to historical synonyms (NASH) to recover IP records from 2018–2023.
+                </span>
+              </li>
+            </ul>
+          </section>
           
           {/* Mission */}
           <section>
