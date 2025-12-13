@@ -13,11 +13,13 @@ const CACHE_TTL_AI = 24 * 60 * 60 * 1000;
 // Patent Feed: 7 Days
 const CACHE_TTL_PATENT = 7 * 24 * 60 * 60 * 1000;
 
-// --- TOPIC EXPANSION MAP ---
+// --- TOPIC EXPANSION MAP (UPDATED v2.2) ---
+// Strategy: Removed 'intitle:' constraints to improve Patent/Abstract recall.
+// Added 2024/2025 Pipeline Drugs (Retatrutide, CagriSema, etc).
 const TOPIC_EXPANSION: Record<string, string> = {
     'MASH / NASH': '("MASH" OR "NASH" OR "MASLD" OR "Steatohepatitis")',
-    'Obesity': '(intitle:"Obesity" OR intitle:"Weight Loss" OR intitle:"BMI" OR intitle:"Semaglutide" OR intitle:"Tirzepatide" OR intitle:"GLP-1")',
-    'Diabetes': '(intitle:"Diabetes" OR intitle:"Type 2" OR intitle:"T2D" OR intitle:"HbA1c" OR intitle:"Insulin" OR intitle:"SGLT2")',
+    'Obesity': '("Obesity" OR "Weight Loss" OR "BMI" OR "Semaglutide" OR "Tirzepatide" OR "Retatrutide" OR "CagriSema" OR "Orforglipron" OR "Amycretin" OR "GLP-1" OR "Amylin" OR "HFpEF" OR "Sleep Apnea")',
+    'Diabetes': '("Diabetes" OR "Type 2" OR "T2D" OR "HbA1c" OR "Insulin" OR "SGLT2" OR "Finerenone" OR "Sotagliflozin")',
     'CVD': '("Cardiovascular" OR "Heart Failure" OR "Atherosclerosis" OR "Myocardial" OR "HFrEF")',
     'CKD': '("Chronic Kidney Disease" OR "CKD" OR "Renal Failure" OR "Nephropathy" OR "Glomerular")'
 };
@@ -263,9 +265,18 @@ export async function* fetchLiteratureAnalysisStream(activeTopics: string[]): As
     const topicStr = activeTopics.map(t => TOPIC_EXPANSION[t] || `"${t}"`).join(' OR ');
     const structuralAnchors = '("p-value" OR "confidence interval" OR "randomized" OR "cohort")';
 
+    // Rebalanced Swarm Architecture: "Prestige" vs "Volume"
+    // Swarm A: "Prestige & Society Swarm" - Targets the "Big 6" and critical society journals (AHA, ADA, Cell, Science).
+    // Swarm B: "Aggregator & Preprint Swarm" - Targets high-volume aggregators (Elsevier, Wiley, OUP, Springer) and Preprints.
     const swarmConfig = [
-        { name: "Publisher Hub Swarm", query: `(site:nature.com OR site:nejm.org OR site:thelancet.com OR site:jamanetwork.com OR site:sciencedirect.com OR site:onlinelibrary.wiley.com) ${topicStr} ${structuralAnchors} after:${dateStr} -news -editorial -commentary` },
-        { name: "PubMed & Preprint Dragnet", query: `(site:pubmed.ncbi.nlm.nih.gov OR site:biorxiv.org OR site:medrxiv.org) ${topicStr} after:${dateStr} -news` }
+        { 
+            name: "Prestige & Society Swarm", 
+            query: `(site:nature.com OR site:science.org OR site:nejm.org OR site:thelancet.com OR site:jamanetwork.com OR site:cell.com OR site:diabetesjournals.org OR site:ahajournals.org) ${topicStr} ${structuralAnchors} after:${dateStr} -news -editorial -commentary` 
+        },
+        { 
+            name: "Aggregator & Preprint Swarm", 
+            query: `(site:sciencedirect.com OR site:onlinelibrary.wiley.com OR site:academic.oup.com OR site:link.springer.com OR site:biorxiv.org OR site:medrxiv.org OR site:pubmed.ncbi.nlm.nih.gov) ${topicStr} after:${dateStr} -news` 
+        }
     ];
 
     let allCollectedPapers: PaperData[] = [];

@@ -85,7 +85,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     <BrainCircuit className="w-3 h-3 text-teal-400" />
                     <div className="text-teal-400 text-xs font-bold">Consolidated Swarms</div>
                 </div>
-                <p className="text-slate-500 text-xs">Replaced single-agent queries with 2 high-density swarms ("Hubs" & "Dragnet") to maximize coverage while minimizing API calls.</p>
+                <p className="text-slate-500 text-xs">Replaced single-agent queries with 2 high-density swarms ("Prestige" & "Aggregator") to maximize coverage while minimizing API calls.</p>
               </div>
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                 <div className="flex items-center gap-2 mb-1">
@@ -123,7 +123,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
               </li>
               <li>
                 <span className="text-slate-300 font-bold">Parallel Swarm Execution:</span> 
-                If fresh data is needed, we launch the <strong>Publisher Hub Swarm</strong> and <strong>Dragnet Swarm</strong> sequentially.
+                If fresh data is needed, we launch the <strong>Prestige & Society Swarm</strong> and <strong>Aggregator Swarm</strong> sequentially.
               </li>
               <li>
                 <span className="text-slate-300 font-bold">Streaming & Verification:</span> 

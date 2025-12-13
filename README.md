@@ -24,10 +24,10 @@ It features a dual-mode architecture:
 
 BioInsight.AI utilizes a **Hybrid Swarm Architecture** optimized for high-recall performance and resilience against API rate limits.
 
-### 1. The Hub & Spoke Model
-To bypass query length limits while ensuring coverage of 1000+ specialty journals (e.g., *JASN*, *JACC*, *Hepatology*), we target "Publisher Hubs":
-*   **Swarm A: The Publisher Hubs (High Precision)**: Scans the "Big 4" (Nature, Science, NEJM, Lancet) PLUS major aggregator hubs: **Elsevier (ScienceDirect), Oxford Academic, Springer, and Wiley**.
-*   **Swarm B: The Dragnet (High Recall)**: Scans **PubMed** and Preprint servers (BioRxiv/MedRxiv) to catch anything missed by the main hubs.
+### 1. The Hub & Spoke Model (Rebalanced)
+To maximize coverage of 1000+ specialty journals without exceeding API query limits, we utilize a "Prestige vs. Volume" split strategy:
+*   **Swarm A: The Prestige & Society Swarm**: Targets the absolute highest impact factors ("Big 6") and critical society journals. Covers: **Nature, Science, NEJM, Lancet, JAMA, Cell, AHA Journals, and Diabetes Care**.
+*   **Swarm B: The Aggregator & Preprint Swarm**: Casts a wide net over massive publisher hubs and preprint servers. Covers: **Elsevier (ScienceDirect), Wiley, Oxford Academic, Springer, PubMed, BioRxiv, and MedRxiv**.
 
 ### 2. "Cache-First, Ask-Later" Strategy
 *   **Smart Caching**: Every search result is hashed and stored locally with a 15-minute Time-To-Live (TTL).
@@ -37,10 +37,10 @@ To bypass query length limits while ensuring coverage of 1000+ specialty journal
 *   **Generator Pattern**: The UI does not wait for the entire scan to finish. 
 *   **Instant Feedback**: Papers are yielded to the dashboard as soon as the first agent returns, reducing perceived latency to <2 seconds.
 
-### 4. Semantic Signal Denoising (New in v2.1)
-To combat "Semantic Noise Saturation" in high-volume topics like **Obesity** and **Diabetes**, we introduced a dual-layer filtering strategy:
-*   **Title Constraints**: Uses `intitle:` operators to ensure the paper is *primarily* about the topic, not just a footnote.
-*   **Structural Anchors**: The search query now strictly enforces the presence of methodological keywords (`"p-value"`, `"confidence interval"`, `"randomized"`). This effectively strips out editorials, news, and collection pages, ensuring only data-rich primary research enters the analysis pipeline.
+### 4. Semantic Signal Denoising (v2.2)
+To combat "Semantic Noise Saturation" while capturing emerging science in **Obesity** and **Diabetes**, we utilize a dynamic vocabulary strategy:
+*   **Smart Vocabulary Expansion**: We explicitly target next-gen therapeutic keywords (e.g., *Retatrutide, CagriSema, Orforglipron*) and comorbidities (*HFpEF*) to capture breakthrough trials before they are indexed with standard disease tags.
+*   **Constraint Relaxation**: We removed rigid `intitle:` constraints to improve **Patent** and **Abstract** recall, relying instead on **Structural Anchors** (keywords like `"p-value"`, `"confidence interval"`, `"randomized"`) to filter out non-data-driven content like editorials.
 *   **Negative Prompt Tuning**: The AI Agents now use explicit negative constraints (e.g., `-editorial`, `-commentary`) in both the search query and the extraction instructions to reject non-data-driven content.
 
 ## 📚 Active Source Watchlist
